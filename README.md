@@ -1,3 +1,6 @@
+> ⚠️ **重要声明（2026-08-16）**：当前 profile-bundle 安装方式**已废弃**——在某些 DSH 版本上会导致 Web UI 无法打开。请**不要安装**本仓库的 bundle 版本。
+> 项目正在重构为 **DSH 动态插件（热更新）路线**：通过会话内 `cordis_define / cordis_run` 加载，不动 profile、无需重启。完成前，本仓库仅作设计与源码参考。
+
 # ⚡ dsh-agent-conductor · DSH 指挥家
 
 **把 DeepSeek Harness 变成一支 agent 小队的指挥家：在 DSH 里直接派活给 Codex、Claude Code、TraeCode、OpenCode、Gemini、Cursor、Kimi、Qwen、Copilot、WorkBuddy、Grok 等 11 种外部 agent CLI，结果自动回收到任务看板。**
