@@ -186,6 +186,9 @@ export function apply(ctx) {
   /** 本进程内最近的派活记录（面板历史 + 任务看板回收共用）。 */
   const recentRuns = []
 
+  /** 客户端上报的运行日志（诊断通道：浏览器端把加载/执行情况 POST 回来）。 */
+  const clientLogs = []
+
   async function runDispatch(agentId, task, signal, onFriendlyError) {
     const agent = AGENTS.find((entry) => entry.id === agentId)
     if (!agent) {
@@ -234,6 +237,34 @@ export function apply(ctx) {
               const agents = await installedStatus()
               res.writeHead(200, { 'content-type': 'application/json' })
               res.end(JSON.stringify({ agents }))
+            } catch (error) {
+              res.writeHead(500, { 'content-type': 'application/json' })
+              res.end(JSON.stringify({ error: String(error?.message ?? error) }))
+            }
+          },
+        })
+        scope.webServer.register({
+          name: 'conductor-client-log',
+          kind: 'exact',
+          path: '/conductor/client-log',
+          handler: async (req, res) => {
+            if (req.method === 'GET') {
+              res.writeHead(200, { 'content-type': 'application/json' })
+              res.end(JSON.stringify({ logs: clientLogs }))
+              return
+            }
+            if (req.method !== 'POST') {
+              res.writeHead(405).end()
+              return
+            }
+            try {
+              const chunks = []
+              for await (const chunk of req) chunks.push(chunk)
+              const body = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+              clientLogs.push({ ts: Date.now(), msg: String(body?.msg || '').slice(0, 800) })
+              if (clientLogs.length > 50) clientLogs.shift()
+              res.writeHead(200, { 'content-type': 'application/json' })
+              res.end(JSON.stringify({ ok: true }))
             } catch (error) {
               res.writeHead(500, { 'content-type': 'application/json' })
               res.end(JSON.stringify({ error: String(error?.message ?? error) }))

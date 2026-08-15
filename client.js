@@ -12,8 +12,28 @@ window.__ModuleLoader__.load({
   factory: function (require) {
     var module = { exports: {} }
     var exports = module.exports
-    var React = require('react')
+    function report(msg) {
+      try {
+        fetch('/conductor/client-log', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ msg: String(msg).slice(0, 800) }),
+        }).catch(function () {})
+      } catch { /* 忽略 */ }
+    }
+    function reportGlobal(e) { report('[global] ' + (e && e.message ? e.message : String(e))) }
+    try { window.addEventListener('error', reportGlobal) } catch { /* 忽略 */ }
+    try { window.addEventListener('unhandledrejection', function (e) { reportGlobal(e && e.reason) }) } catch { /* 忽略 */ }
+    report('factory-start')
+    var React
+    try {
+      React = require('react')
+    } catch (e) {
+      report('require(react) failed: ' + (e && e.message))
+      React = (typeof window !== 'undefined' && window.React) ? window.React : null
+    }
     var R = React
+    report('react=' + (React ? 'ok' : 'missing'))
 
     var BOARD_KEY = 'dsh.taskBoard.v1'
 
@@ -409,8 +429,10 @@ window.__ModuleLoader__.load({
     })
 
     function apply(ctx) {
-      var slots = ctx.get('slots')
-      if (slots === undefined) { console.error('[conductor] slots service missing'); return }
+      report('apply-start')
+      var slots
+      try { slots = ctx.get('slots') } catch (e) { report('ctx.get(slots) failed: ' + (e && e.message)); return }
+      if (slots === undefined) { report('slots missing'); console.error('[conductor] slots service missing'); return }
 
       slots.inject('sidebar.footer.action', function () {
         return slots.register(
@@ -432,9 +454,10 @@ window.__ModuleLoader__.load({
         )
       })
 
-      try { mountNavEntry() } catch (e) { console.error('[conductor] nav mount failed', e) }
-      try { mountBoardBar() } catch (e) { console.error('[conductor] board bar failed', e) }
-      try { ensureFab() } catch (e) { console.error('[conductor] fab failed', e) }
+      try { mountNavEntry(); report('nav-mounted=' + navMounted) } catch (e) { report('nav mount failed: ' + (e && e.message)); console.error('[conductor] nav mount failed', e) }
+      try { mountBoardBar(); report('bar-mounted=' + (boardBar && document.body.contains(boardBar))) } catch (e) { report('board bar failed: ' + (e && e.message)); console.error('[conductor] board bar failed', e) }
+      try { ensureFab(); report('fab-ok') } catch (e) { report('fab failed: ' + (e && e.message)); console.error('[conductor] fab failed', e) }
+      report('apply-done view=' + (document.querySelector('[data-dsh-taskboard-view]') ? 'yes' : 'no'))
       var fabRetry = setTimeout(ensureFab, 3000)
       navObserver.observe(document.body, { childList: true, subtree: true })
       subscribe(function () {
