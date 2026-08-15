@@ -280,6 +280,74 @@ window.__ModuleLoader__.load({
       )
     }
 
+    // ---------- 看板内嵌指挥家工具条 ----------
+    var selected = null
+    var boardBar = null
+
+    function renderBarInto(bar) {
+      bar.innerHTML = ''
+      var title = document.createElement('span')
+      title.textContent = '⚡ 指挥家'
+      title.style.cssText = 'font-weight:700;font-size:13px;margin-right:2px;flex:none'
+      bar.appendChild(title)
+      var agents = state.agents || []
+      var installed = agents.filter(function (a) { return a.installed })
+      if (installed.length === 0) {
+        var hint = document.createElement('span')
+        hint.textContent = '未检测到已安装的 agent CLI（装好 Codex 等再试）'
+        hint.style.cssText = 'opacity:.6'
+        bar.appendChild(hint)
+      }
+      installed.forEach(function (a) {
+        var chip = document.createElement('button')
+        chip.textContent = a.name
+        var on = selected === a.id
+        chip.style.cssText = 'border:1px solid ' + (on ? '#4D6BFE' : 'rgba(120,140,200,.4)') +
+          ';background:' + (on ? 'rgba(77,107,254,.28)' : 'transparent') +
+          ';color:#e6e9f5;border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;flex:none'
+        chip.onclick = function () { selected = a.id; renderBarInto(bar) }
+        bar.appendChild(chip)
+      })
+      var input = document.createElement('input')
+      input.placeholder = '任务描述…'
+      input.style.cssText = 'flex:1;min-width:140px;background:rgba(8,12,28,.85);border:1px solid rgba(120,140,200,.3);border-radius:8px;color:#e6e9f5;padding:6px 10px;font-size:12px;outline:none'
+      bar.appendChild(input)
+      var btn = document.createElement('button')
+      btn.textContent = '派活'
+      btn.style.cssText = 'background:#4D6BFE;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;flex:none'
+      btn.onclick = function () {
+        var task = input.value
+        if (!task.trim()) { input.focus(); return }
+        if (!selected && installed.length) selected = installed[0].id
+        if (!selected) return
+        dispatch(selected, task)
+      }
+      bar.appendChild(btn)
+      var status = document.createElement('span')
+      status.style.cssText = 'flex:none;font-size:12px'
+      if (state.busy) {
+        status.textContent = '⏳ ' + state.busy.agent + ' 干活中…'
+        status.style.color = '#f4c266'
+      } else if (state.result) {
+        status.textContent = state.result.status === 'succeeded' ? '✅ 已回收至看板' : '❌ 失败，见看板'
+        status.style.color = state.result.status === 'succeeded' ? '#8ee9b0' : '#ff9d9d'
+        status.title = state.result.text.slice(0, 300)
+      }
+      bar.appendChild(status)
+    }
+
+    function mountBoardBar() {
+      if (typeof document === 'undefined') return
+      if (boardBar && document.body.contains(boardBar)) return
+      var view = document.querySelector('[data-dsh-taskboard-view]')
+      if (!view || !view.parentElement) return
+      boardBar = document.createElement('div')
+      boardBar.setAttribute('data-conductor-bar', '1')
+      boardBar.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 12px;margin:0 0 8px;border:1px solid rgba(120,140,200,.35);border-radius:12px;background:rgba(14,22,48,.92);color:#e6e9f5;font-size:12px;flex-wrap:wrap'
+      view.parentElement.insertBefore(boardBar, view)
+      renderBarInto(boardBar)
+    }
+
     // ---------- 与任务看板合一：一个入口开两个页面 ----------
     function boardEntry() { return document.querySelector('[data-dsh-taskboard-entry]') }
     function openBoardIfClosed() {
@@ -336,6 +404,8 @@ window.__ModuleLoader__.load({
         navMounted = false
         mountNavEntry()
       }
+      mountBoardBar()
+      if (boardBar && document.body.contains(boardBar)) renderBarInto(boardBar)
     })
 
     function apply(ctx) {
@@ -362,10 +432,14 @@ window.__ModuleLoader__.load({
         )
       })
 
-      mountNavEntry()
-      ensureFab()
+      try { mountNavEntry() } catch (e) { console.error('[conductor] nav mount failed', e) }
+      try { mountBoardBar() } catch (e) { console.error('[conductor] board bar failed', e) }
+      try { ensureFab() } catch (e) { console.error('[conductor] fab failed', e) }
       var fabRetry = setTimeout(ensureFab, 3000)
       navObserver.observe(document.body, { childList: true, subtree: true })
+      subscribe(function () {
+        if (boardBar && document.body.contains(boardBar)) renderBarInto(boardBar)
+      })
       var pollTimer = setInterval(function () {
         if (state.open || state.busy) pollRuns()
       }, 4000)
@@ -377,6 +451,8 @@ window.__ModuleLoader__.load({
           clearTimeout(fabRetry)
           var entry = document.querySelector('[data-conductor-entry]')
           if (entry) entry.remove()
+          if (boardBar && document.body.contains(boardBar)) boardBar.remove()
+          boardBar = null
           if (fab && document.body.contains(fab)) fab.remove()
           fab = null
           navMounted = false
