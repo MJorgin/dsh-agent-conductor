@@ -1,0 +1,14 @@
+{
+  "name": "dsh-agent-conductor",
+  "version": "0.2.0",
+  "description": "In-session cross-agent dispatch for DeepSeek Harness: the conductor_dispatch tool and an auto-triggered skill send self-contained tasks to 11 external agent CLIs. Host-only bundle — no client half.",
+  "type": "module",
+  "main": "index.js",
+  "files": ["index.js", "cordis.patch.yml", "skills", "README.md"],
+  "license": "MIT",
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}

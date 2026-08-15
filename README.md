@@ -57,9 +57,24 @@ npm i -g opencode-ai
 | OpenCode | `opencode run "{task}"` | ✅ 官方文档 |
 | Gemini / Cursor / Kimi / Qwen / Copilot / WorkBuddy / Grok | 见 `dispatch.py` 注册表 | ⏳ 命令形态待实测 |
 
+## 可选：bundle 安装（host-only）
+
+仓库同时是一个 **host-only** dsh bundle（声明 `dsh.bundle`、**无任何客户端代码**），一条命令把 `conductor_dispatch` 工具装进 profile：
+
+```sh
+dsh plugin --profile web add github:akqwpeter-prog/dsh-agent-conductor
+```
+
+- 工具与技能共用同一份 CLI 注册表；
+- 无 client 半边，不影响 Web UI（早期带面板的客户端版本因此移除，见 git log）；
+- 面板/任务看板回收等功能走路线图，另行实现。
+
 ## 仓库内容
 
+
 ```
+index.js                      # bundle 宿主半边：conductor_dispatch 工具（host-only）
+cordis.patch.yml              # bundle 层（单行，无客户端）
 skills/conductor/SKILL.md      # 技能定义：触发描述 + 派活规则 + 隐私
 skills/conductor/scripts/dispatch.py  # 派活引擎（Python 标准库，零依赖）
 conductor-dynamic.js           # 备选：动态插件版（cordis_define 路线）

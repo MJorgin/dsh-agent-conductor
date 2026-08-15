@@ -1,0 +1,5 @@
+# dsh-agent-conductor bundle layer: host-only row. No dsh.client manifest —
+# this bundle ships no browser code and cannot affect the Web UI.
+- insert:
+    - id: conductor
+      name: dsh-agent-conductor
