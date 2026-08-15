@@ -430,8 +430,7 @@ window.__ModuleLoader__.load({
 
     function apply(ctx) {
       report('apply-start')
-      var slots
-      try { slots = ctx.get('slots') } catch (e) { report('ctx.get(slots) failed: ' + (e && e.message)); return }
+      var slots = ctx.slots
       if (slots === undefined) { report('slots missing'); console.error('[conductor] slots service missing'); return }
 
       slots.inject('sidebar.footer.action', function () {
@@ -484,7 +483,7 @@ window.__ModuleLoader__.load({
     }
 
     exports.apply = apply
-    exports.inject = []
+    exports.inject = ['slots']
     return module.exports
   },
 })
