@@ -144,8 +144,8 @@ window.__ModuleLoader__.load({
 
     // ---------- 样式（硬编码深色，避免主题变量在浮层不解析） ----------
     var s = {
-      panel: { position: 'fixed', top: 64, right: 24, width: 430, maxHeight: 'calc(100vh - 96px)', overflow: 'auto',
-        background: '#0e1630', border: '1px solid rgba(120,140,200,.35)', borderRadius: 16, padding: 16, zIndex: 2000,
+      panel: { position: 'fixed', top: 64, right: 20, width: 390, maxHeight: 'calc(100vh - 96px)', overflow: 'auto',
+        background: 'rgba(14,22,48,.96)', border: '1px solid rgba(120,140,200,.4)', borderRadius: 16, padding: 16, zIndex: 2000,
         boxShadow: '0 16px 48px rgba(0,0,0,.6)', color: '#e6e9f5', fontFamily: 'inherit' },
       head: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontWeight: 700, fontSize: 15 },
       sub: { fontSize: 11, opacity: .6, fontWeight: 400 },
@@ -280,6 +280,16 @@ window.__ModuleLoader__.load({
       )
     }
 
+    // ---------- 与任务看板合一：一个入口开两个页面 ----------
+    function boardEntry() { return document.querySelector('[data-dsh-taskboard-entry]') }
+    function openBoardIfClosed() {
+      var tb = boardEntry()
+      // 看板入口带 data-active 属性表示已打开；未打开时程序化点击它。
+      if (tb && tb.getAttribute('data-active') === null) {
+        try { tb.click() } catch { /* 忽略 */ }
+      }
+    }
+
     // ---------- 侧边栏导航入口（照任务看板的 DOM 注入方式） ----------
     var navMounted = false
     function mountNavEntry() {
@@ -293,7 +303,7 @@ window.__ModuleLoader__.load({
       entry.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;padding:7px 10px;border-radius:8px;cursor:pointer;color:var(--dsw-alias-label-primary);font-size:13px;font-weight:500;box-sizing:border-box;user-select:none'
       entry.onmouseenter = function () { entry.style.background = 'var(--dsw-alias-interactive-bg-hover)' }
       entry.onmouseleave = function () { entry.style.background = '' }
-      entry.onclick = function () { openPanel() }
+      entry.onclick = function () { openBoardIfClosed(); openPanel() }
       var iconEl = document.createElement('span')
       iconEl.textContent = '⚡'
       iconEl.style.cssText = 'flex:none;font-size:15px;line-height:1'
@@ -304,6 +314,20 @@ window.__ModuleLoader__.load({
       entry.appendChild(label)
       anchor.parentElement.insertBefore(entry, anchor.nextSibling)
       navMounted = true
+    }
+
+    // ---------- 悬浮球兜底入口：任何情况下都保证能看到 ----------
+    var fab = null
+    function ensureFab() {
+      if (typeof document === 'undefined' || !document.body) return
+      if (fab && document.body.contains(fab)) return
+      fab = document.createElement('button')
+      fab.setAttribute('data-conductor-fab', '1')
+      fab.textContent = '⚡'
+      fab.title = '指挥家：打开任务看板并派活给外部 agent'
+      fab.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:1900;width:48px;height:48px;border-radius:50%;border:none;background:#4D6BFE;color:#fff;font-size:22px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,.45)'
+      fab.onclick = function () { openBoardIfClosed(); openPanel() }
+      document.body.appendChild(fab)
     }
     var navObserver = new MutationObserver(function () {
       if (!navMounted) {
@@ -324,8 +348,8 @@ window.__ModuleLoader__.load({
           function () {
             return R.createElement('button', {
               style: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: 'inherit', padding: 4 },
-              title: '指挥家：把活派给别的 agent CLI',
-              onClick: function () { openPanel() },
+              title: '指挥家：打开任务看板并派活给外部 agent',
+              onClick: function () { openBoardIfClosed(); openPanel() },
             }, '⚡')
           },
         )
@@ -339,6 +363,8 @@ window.__ModuleLoader__.load({
       })
 
       mountNavEntry()
+      ensureFab()
+      var fabRetry = setTimeout(ensureFab, 3000)
       navObserver.observe(document.body, { childList: true, subtree: true })
       var pollTimer = setInterval(function () {
         if (state.open || state.busy) pollRuns()
@@ -348,8 +374,11 @@ window.__ModuleLoader__.load({
         return function () {
           navObserver.disconnect()
           clearInterval(pollTimer)
+          clearTimeout(fabRetry)
           var entry = document.querySelector('[data-conductor-entry]')
           if (entry) entry.remove()
+          if (fab && document.body.contains(fab)) fab.remove()
+          fab = null
           navMounted = false
         }
       }, 'conductor: client side effects')
