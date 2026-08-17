@@ -91,3 +91,11 @@ conductor-dynamic.js           # 备选：动态插件版（cordis_define 路线
 ## License
 
 [MIT](LICENSE)
+
+## 相关链接
+
+- 🎨 [dsh-media-skills](https://github.com/akqwpeter-prog/dsh-media-skills) —— 同作者的 DSH 读图/生图插件（GLM-4V-Flash + Qwen3-VL + Gemini 三引擎容错）
+- ⚡ 本仓库：[dsh-agent-conductor](https://github.com/akqwpeter-prog/dsh-agent-conductor)
+- 📬 社区收录 PR：[awesome-dsh-plugin#664](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/664)
+- 📋 精选列表：[awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) · 生态索引：[dsh-plugin topic](https://github.com/topics/dsh-plugin)
+- 🎯 对标：[Multica](https://github.com/multica-ai/multica)（多 agent 工作台）· [dsh-web-ui](https://github.com/zhu1090093659/dsh-web-ui)（任务看板）
