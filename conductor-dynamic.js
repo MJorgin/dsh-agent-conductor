@@ -51,7 +51,7 @@ return {
       presentCall: (args) => ({
         card: 'generic',
         title: `指挥家 → ${args?.agent ?? '?'}`,
-        kind: 'run',
+        kind: 'execute',
         rawInput: args,
       }),
       async execute(args, exec) {
