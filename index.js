@@ -70,11 +70,15 @@ export function apply(ctx) {
         throw new Error('宿主 subprocess 服务不可用')
       }
       const argv = agent.argv.map((a) => a.split('{task}').join(args.task))
+      // Work directory: CONDUCTOR_CWD env (same contract as dispatch.py —
+      // Codex needs a trusted git repo; see README), falling back to the
+      // harness's own working directory.
+      const cwd = process.env.CONDUCTOR_CWD?.trim() || process.cwd()
       let child
       try {
         child = subprocess.spawn({
           argv,
-          cwd: '/Users/mj/deepseek-harness',
+          cwd,
           stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
           graceMs: 15000,
         })

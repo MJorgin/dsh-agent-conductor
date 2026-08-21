@@ -1,101 +1,129 @@
-# ⚡ dsh-agent-conductor · DSH 指挥家（Skill 版）
+<div align="center">
 
-<img src="docs/social-preview.png" alt="dsh-agent-conductor" width="100%">
+<img src="docs/social-preview.png" alt="dsh-agent-conductor — in-session cross-agent dispatch for DeepSeek Harness" width="100%">
 
-**让 DeepSeek Harness 的 agent 自动识别派活需求，把任务派给 11 种外部 agent CLI（Codex、Claude Code、TraeCode、OpenCode、Gemini、Cursor、Kimi、Qwen、Copilot、WorkBuddy、Grok）无头执行，结果回传会话。**
+# ⚡ dsh-agent-conductor
 
-> 灵感来自 [Multica](https://github.com/multica-ai/multica)——把"agent 小队"概念做成一个零安装成本的 DSH 技能。
+### *Let your DeepSeek Harness agent dispatch tasks to 11 external agent CLIs — Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok — headlessly, and bring results back into the conversation.*
 
-## 为什么是 Skill
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4D6BFE)](https://github.com/topics/dsh-plugin)
+[![Zero deps](https://img.shields.io/badge/deps-zero-2EA44F)](skills/conductor/scripts/dispatch.py)
+[![Agents](https://img.shields.io/badge/agents-11-blue)](README.md#-agents)
 
-| | profile 插件 / bundle | 动态插件 | **Skill（本方案）** |
+**English** · [**简体中文**](docs/lang/README_ZH.md)
+
+</div>
+
+---
+
+DeepSeek Harness is a great reasoning engine — but sometimes the job is better done by *another* coding agent: a Codex translation, a Claude Code investigation, a Cursor refactor. This plugin lets your DSH agent **recognize when to delegate** (by skill-description matching), **dispatch a self-contained task** to one of 11 external agent CLIs in headless mode, and **bring the stdout result back as the answer**.
+
+> Inspired by [Multica](https://github.com/multica-ai/multica) — the "agent squad" idea as a zero-install DSH skill.
+
+## ✨ What you get
+
+| Capability | What it does | Cost |
+|---|---|---|
+| 🧠 Auto-triggered dispatch | Say "have Codex translate this README" — the model matches the skill, runs the dispatch script, and answers from the result | Free (uses the target CLI's quota) |
+| 🔧 `conductor_dispatch` tool (optional bundle) | The same registry as a first-class DSH tool, installed into a profile with one command | Free |
+| 👥 11 agent CLIs | Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok | Their login quotas |
+| 🔒 Privacy | Task text goes only to the CLI's own provider; keys stay local | — |
+
+## 🧭 Why a Skill (and not just a plugin)
+
+| | profile plugin / bundle | dynamic plugin | **Skill (this repo)** |
 |---|---|---|---|
-| 安装 | 写 profile + 重启 | 会话内定义 | **复制一个文件夹** |
-| 触发 | 手动 | 模型调工具 | **描述匹配，模型自动识别** |
-| 风险 | 可能影响 Web UI | 会话级、重启消失 | 只读脚本，宿主无感 |
-| 结果 | 工具结果 | 工具结果 | **stdout 直接成为回答依据** |
+| Install | write profile + restart | define in-session | **copy a folder** |
+| Trigger | manual | model calls a tool | **description matching, model auto-recognizes** |
+| Risk | touches the host | session-scoped, gone on restart | read-only script, host-agnostic |
+| Result | tool result | tool result | **stdout directly becomes the answer** |
 
-一个 `SKILL.md` + 一个 90 行的 `dispatch.py`，完事。
+One `SKILL.md` + a ~90-line zero-dependency `dispatch.py` (Python stdlib only).
 
-## 安装
+## ⚡ Quick start (Skill)
 
-把 `skills/conductor/` 复制到任意技能根目录（项目级 `.dsh/skills/` 或全局 `~/.dsh/skills/`）：
+Copy `skills/conductor/` to any skill root (project-level `.dsh/skills/` or global `~/.dsh/skills/`):
 
 ```sh
 mkdir -p .dsh/skills/conductor
 cp -R skills/conductor/. .dsh/skills/conductor/
 ```
 
-装完无需重启——下次对话直接说：
+No restart needed — from the next message on, just say:
 
-- 「派 codex 把这份 README 翻译成繁体中文」
-- 「让 Claude Code 查一下这个报错的成因」
-- 「用 Codex 独立实现一个 XXX」
+- "派 codex 把这份 README 翻译成繁体中文" (have Codex translate this README)
+- "让 Claude Code 查一下这个报错的成因" (ask Claude Code to investigate this error)
+- "用 Codex 独立实现一个 XXX" (have Codex implement XXX independently)
 
-agent 会**自动识别**（SKILL.md 描述匹配）→ 执行 `dispatch.py` → 结果回传。
+The agent auto-recognizes the need (SKILL.md description matching) → runs `dispatch.py` → returns the result.
 
-## 前置：想派谁就装谁的 CLI
+## 🛠️ Prereqs: install the CLIs you want to dispatch to
 
 ```sh
-# Codex（机器上已有 codex-cli 时软链到 PATH）
+# Codex (symlink to PATH when you already have codex-cli)
 ln -s ~/.codex/plugins/.plugin-appserver/codex ~/.local/bin/codex
 # Claude Code / OpenCode
 npm i -g @anthropic-ai/claude-code
 npm i -g opencode-ai
-# TraeCode CLI：https://docs.trae.cn/cli_command-line-parameters
+# TraeCode CLI: https://docs.trae.cn/cli_command-line-parameters
 ```
 
-> Codex 要求在受信任的 git 仓库运行：把 `CONDUCTOR_CWD=/path/to/git/repo` 写进 `~/.dsh/secrets/media-tools.env`。
-> 想让派出的 agent 能写文件：Codex 的 `~/.codex/config.toml` 加 `sandbox_mode = "workspace-write"`。
-> 派活消耗对方 CLI 的登录额度。
+> Codex requires a trusted git repo as its working directory: write `CONDUCTOR_CWD=/path/to/git/repo` into `~/.dsh/secrets/media-tools.env` (or export it). The skill script and the bundle tool both honor it, falling back to the current working directory.
+> To let the dispatched agent write files: add `sandbox_mode = "workspace-write"` to Codex's `~/.codex/config.toml`.
+> Dispatching consumes the target CLI's login quota.
 
-## 已验证 vs 待验证
+## ✅ Verified vs ⏳ pending
 
-| CLI | 无头命令 | 状态 |
+| CLI | Headless command | Status |
 |---|---|---|
-| Codex | `codex exec "{task}"` | ✅ 真机实测（翻译任务已产出交付） |
-| Claude Code | `claude -p "{task}" --output-format text` | ✅ 官方文档 |
-| TraeCode | `traecli exec "{task}"` | ✅ 官方文档 |
-| OpenCode | `opencode run "{task}"` | ✅ 官方文档 |
-| Gemini / Cursor / Kimi / Qwen / Copilot / WorkBuddy / Grok | 见 `dispatch.py` 注册表 | ⏳ 命令形态待实测 |
+| Codex | `codex exec "{task}"` | ✅ field-tested (translation task delivered) |
+| Claude Code | `claude -p "{task}" --output-format text` | ✅ per official docs |
+| TraeCode | `traecli exec "{task}"` | ✅ per official docs |
+| OpenCode | `opencode run "{task}"` | ✅ per official docs |
+| Gemini / Cursor / Kimi / Qwen / Copilot / WorkBuddy / Grok | see the `dispatch.py` registry | ⏳ command shape pending field test |
 
-## 可选：bundle 安装（host-only）
+## 📦 Optional: bundle install (host-only tool)
 
-仓库同时是一个 **host-only** dsh bundle（声明 `dsh.bundle`、**无任何客户端代码**），一条命令把 `conductor_dispatch` 工具装进 profile：
+This repo is also a **host-only** dsh bundle (declares `dsh.bundle`, **zero client code** — the Web UI is untouched). One command installs the `conductor_dispatch` tool into a profile:
 
 ```sh
 dsh plugin --profile web add github:MJorgin/dsh-agent-conductor
 ```
 
-- 工具与技能共用同一份 CLI 注册表；
-- 无 client 半边，不影响 Web UI（早期带面板的客户端版本因此移除，见 git log）；
-- 面板/任务看板回收等功能走路线图，另行实现。
+- The tool and the skill share the same CLI registry (`index.js` ⇄ `dispatch.py` — keep them in sync when adding CLIs);
+- No client half, so the Web UI is never affected (the early panel-carrying client version was removed — see git log);
+- Panels / task-board recycling are on the roadmap.
 
-## 仓库内容
-
+## 📂 Repo layout
 
 ```
-index.js                      # bundle 宿主半边：conductor_dispatch 工具（host-only）
-cordis.patch.yml              # bundle 层（单行，无客户端）
-skills/conductor/SKILL.md      # 技能定义：触发描述 + 派活规则 + 隐私
-skills/conductor/scripts/dispatch.py  # 派活引擎（Python 标准库，零依赖）
-conductor-dynamic.js           # 备选：动态插件版（cordis_define 路线）
+index.js                      # bundle host half: conductor_dispatch tool (host-only)
+cordis.patch.yml              # bundle layer (one row, no client)
+skills/conductor/SKILL.md      # skill definition: trigger description + dispatch rules + privacy
+skills/conductor/scripts/dispatch.py  # dispatch engine (Python stdlib, zero deps)
+conductor-dynamic.js           # alternative: dynamic-plugin edition (cordis_define route)
 ```
 
-## 路线图
+## 🗺️ Roadmap
 
-- [ ] 面板 UI（可选，动态插件 client 半边）
-- [ ] 任务看板回收：派活结果写入 dsh-task-board 卡片
-- [ ] 小队编排：一个任务分发给多个 agent 汇总（Multica squads 形态）
+- [ ] Panel UI (optional, dynamic-plugin client half)
+- [ ] Task-board recycling: dispatch results written back to dsh-task-board cards
+- [ ] Squad orchestration: one task fanned out to several agents and merged (Multica squads shape)
+
+## 🔑 Keys & privacy
+
+- Keys are never stored in this repo. The skill script reads env vars, then `~/.dsh/secrets/media-tools.env` (same convention as dsh-media-skills).
+- Task text is sent to the target CLI's provider — never put secrets or internal data into a task.
+- Results belong to the target CLI's terms of service; mark deliverables as "done by <agent name>".
 
 ## License
 
 [MIT](LICENSE)
 
-## 相关链接
+## Related
 
-- 🎨 [dsh-media-skills](https://github.com/MJorgin/dsh-media-skills) —— 同作者的 DSH 读图/生图插件（GLM-4V-Flash + Qwen3-VL + Gemini 三引擎容错）
-- ⚡ 本仓库：[dsh-agent-conductor](https://github.com/MJorgin/dsh-agent-conductor)
-- 📬 社区收录 PR：[awesome-dsh-plugin#664](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/664)
-- 📋 精选列表：[awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) · 生态索引：[dsh-plugin topic](https://github.com/topics/dsh-plugin)
-- 🎯 对标：[Multica](https://github.com/multica-ai/multica)（多 agent 工作台）· [dsh-web-ui](https://github.com/zhu1090093659/dsh-web-ui)（任务看板）
+- 🎨 [dsh-media-skills](https://github.com/MJorgin/dsh-media-skills) — free vision & image generation for DSH (GLM-4V-Flash + Qwen3-VL + Gemini failover)
+- 📬 Community listing PR: [awesome-dsh-plugin#664](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/664)
+- 📋 [awesome-dsh-plugin](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin) · ecosystem index: [dsh-plugin topic](https://github.com/topics/dsh-plugin)
+- 🎯 Benchmarks: [Multica](https://github.com/multica-ai/multica) (multi-agent workbench) · [dsh-web-ui](https://github.com/zhu1090093659/dsh-web-ui) (task board)
