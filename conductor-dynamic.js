@@ -14,17 +14,17 @@ return {
   inject: ['tools', 'subprocess'],
   apply(ctx) {
     const AGENTS = [
-      { id: 'codex', name: 'Codex', argv: ['codex', 'exec', '{task}'], install: 'codex CLI（~/.codex/plugins/.plugin-appserver/codex 可软链到 PATH）' },
+      { id: 'codex', name: 'Codex', argv: ['codex', 'exec', '{task}'], install: 'npm i -g @openai/codex' },
       { id: 'claude-code', name: 'Claude Code', argv: ['claude', '-p', '{task}', '--output-format', 'text'], install: 'npm i -g @anthropic-ai/claude-code' },
       { id: 'trae', name: 'TraeCode', argv: ['traecli', 'exec', '{task}'], install: 'TraeCode CLI（docs.trae.cn）' },
       { id: 'opencode', name: 'OpenCode', argv: ['opencode', 'run', '{task}'], install: 'npm i -g opencode-ai' },
       { id: 'gemini', name: 'Gemini CLI', argv: ['gemini', '-p', '{task}'], install: 'npm i -g @google/gemini-cli' },
       { id: 'cursor', name: 'Cursor CLI', argv: ['cursor-agent', '-p', '{task}'], install: 'cursor.com/install' },
-      { id: 'kimi', name: 'Kimi CLI', argv: ['kimi', '--prompt', '{task}'], install: 'npm i -g kimi-cli' },
+      { id: 'kimi', name: 'Kimi CLI', argv: ['kimi', '--prompt', '{task}'], install: 'npm i -g @moonshot-ai/kimi-code' },
       { id: 'qwen', name: 'Qwen Code', argv: ['qwen', '--prompt', '{task}'], install: 'npm i -g @qwen-code/qwen-code' },
-      { id: 'copilot', name: 'Copilot CLI', argv: ['github-copilot', '--prompt', '{task}'], install: 'npm i -g @github/copilot' },
+      { id: 'copilot', name: 'Copilot CLI', argv: ['copilot', '-p', '{task}', '--allow-all-tools'], install: 'npm i -g @github/copilot' },
       { id: 'workbuddy', name: 'WorkBuddy', argv: ['workbuddy', '-p', '{task}'], install: '见官方教程' },
-      { id: 'grok', name: 'Grok CLI', argv: ['grok', '-p', '{task}'], install: 'xAI 官方安装' },
+      { id: 'grok', name: 'Grok CLI', argv: ['grok', '-p', '{task}'], install: 'npm i -g @xai-official/grok' },
     ]
 
     const tool = harness.defineTool({

@@ -20,7 +20,7 @@ MAX_OUTPUT_CHARS = 20_000
 AGENTS = {
     "codex":        {"name": "Codex",       "argv": ["codex", "exec", "{task}"],
                      "bin": "codex",
-                     "install": "codex CLI（已有 codex-cli 时：ln -s ~/.codex/plugins/.plugin-appserver/codex ~/.local/bin/codex）"},
+                     "install": "npm i -g @openai/codex（或软链已有 codex-cli：ln -s ~/.codex/plugins/.plugin-appserver/codex ~/.local/bin/codex）"},
     "claude-code":  {"name": "Claude Code", "argv": ["claude", "-p", "{task}", "--output-format", "text"],
                      "bin": "claude",
                      "install": "npm i -g @anthropic-ai/claude-code"},
@@ -38,19 +38,19 @@ AGENTS = {
                      "install": "cursor.com/install"},
     "kimi":         {"name": "Kimi CLI",    "argv": ["kimi", "--prompt", "{task}"],
                      "bin": "kimi",
-                     "install": "npm i -g kimi-cli"},
+                     "install": "npm i -g @moonshot-ai/kimi-code"},
     "qwen":         {"name": "Qwen Code",   "argv": ["qwen", "--prompt", "{task}"],
                      "bin": "qwen",
                      "install": "npm i -g @qwen-code/qwen-code"},
-    "copilot":      {"name": "Copilot CLI", "argv": ["github-copilot", "--prompt", "{task}"],
-                     "bin": "github-copilot",
-                     "install": "npm i -g @github/copilot"},
+    "copilot":      {"name": "Copilot CLI", "argv": ["copilot", "-p", "{task}", "--allow-all-tools"],
+                     "bin": "copilot",
+                     "install": "npm i -g @github/copilot（无头模式自动带 --allow-all-tools 放行工具）"},
     "workbuddy":    {"name": "WorkBuddy",   "argv": ["workbuddy", "-p", "{task}"],
                      "bin": "workbuddy",
                      "install": "见官方教程"},
     "grok":         {"name": "Grok CLI",    "argv": ["grok", "-p", "{task}"],
                      "bin": "grok",
-                     "install": "xAI 官方安装"},
+                     "install": "npm i -g @xai-official/grok（或 curl -fsSL https://x.ai/cli/install.sh | bash）"},
 }
 
 def load_conf(name):

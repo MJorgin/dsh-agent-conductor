@@ -47,13 +47,21 @@ agent 会**自动识别**（SKILL.md 描述匹配）→ 执行 `dispatch.py` →
 ## 前置：想派谁就装谁的 CLI
 
 ```sh
-# Codex（机器上已有 codex-cli 时软链到 PATH）
-ln -s ~/.codex/plugins/.plugin-appserver/codex ~/.local/bin/codex
-# Claude Code / OpenCode
+# Codex / Claude Code / OpenCode / Gemini / Qwen
+npm i -g @openai/codex
 npm i -g @anthropic-ai/claude-code
 npm i -g opencode-ai
+npm i -g @google/gemini-cli
+npm i -g @qwen-code/qwen-code
+# Kimi / Grok / Copilot（无头参数已逐一对照各 CLI 自带 --help 核实）
+npm i -g @moonshot-ai/kimi-code
+npm i -g @xai-official/grok
+npm i -g @github/copilot
 # TraeCode CLI：https://docs.trae.cn/cli_command-line-parameters
+#（机器上已有 codex-cli 也可软链：ln -s ~/.codex/plugins/.plugin-appserver/codex ~/.local/bin/codex）
 ```
+
+> 无头提示：Copilot 非交互模式必须自动放行工具，注册表实际执行 `copilot -p "<任务>" --allow-all-tools`；其余 CLI 用各自标准的 print/headless 参数。
 
 装完先自检，看本机到底能派谁（解析 PATH + 试跑版本号）：
 
@@ -72,10 +80,18 @@ python3 skills/conductor/scripts/dispatch.py doctor
 | CLI | 无头命令 | 状态 |
 |---|---|---|
 | Codex | `codex exec "{task}"` | ✅ 真机实测（翻译任务已产出交付） |
-| Claude Code | `claude -p "{task}" --output-format text` | ✅ 官方文档 |
+| Claude Code | `claude -p "{task}" --output-format text` | ✅ 本机已装；官方文档 |
 | TraeCode | `traecli exec "{task}"` | ✅ 官方文档 |
 | OpenCode | `opencode run "{task}"` | ✅ 官方文档 |
-| Gemini / Cursor / Kimi / Qwen / Copilot / WorkBuddy / Grok | 见 `dispatch.py` 注册表 | ⏳ 命令形态待实测 |
+| Gemini CLI | `gemini -p "{task}"` | ✅ 官方文档 |
+| Qwen Code | `qwen --prompt "{task}"` | ✅ 官方文档（Gemini-CLI 分支） |
+| Kimi CLI | `kimi --prompt "{task}"` | ✅ 对照 CLI 自带 help 确认（`-p, --prompt` 即非交互） |
+| Copilot CLI | `copilot -p "{task}" --allow-all-tools` | ✅ 对照 `copilot --help` 确认（可执行名是 `copilot` 而非 `github-copilot`；无头必须带 `--allow-all-tools`） |
+| Grok CLI | `grok -p "{task}"` | ✅ 官方 README（`grok -p "..."` 即跑单个任务） |
+| Cursor CLI | `cursor-agent -p "{task}"` | ⏳ 命令形态待实测（走 cursor.com 安装；npm 上的 `cursor-agent` 包与此无关） |
+| WorkBuddy | `workbuddy -p "{task}"` | ⏳ 命令形态待实测 |
+
+> 安装包已对照 npm registry 核实：Kimi 是 `@moonshot-ai/kimi-code`（bin `kimi`）、Grok 是 `@xai-official/grok`（bin `grok`）、Copilot 是 `@github/copilot`（bin `copilot`）、Codex 是 `@openai/codex`。npm 上的 `kimi-cli` 是个没有二进制的占位包，请勿使用。
 
 ## 可选：bundle 安装（host-only）
 
