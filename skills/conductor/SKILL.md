@@ -9,6 +9,14 @@ description: "派活给外部 agent CLI（DSH 指挥家）。当用户想让另�
 
 ## 用法
 
+先自检（推荐）——列出本机已装好、能直接派活的 CLI，并顺带试跑版本号：
+
+```bash
+python3 scripts/dispatch.py doctor
+```
+
+正式派活：
+
 ```bash
 python3 scripts/dispatch.py <agent> "<任务>"
 ```
@@ -21,7 +29,7 @@ python3 scripts/dispatch.py <agent> "<任务>"
 ## 规则
 
 - **沙箱权限**：脚本在 DSH 的 bash 工具沙箱里运行，多数 agent CLI 需要写自己的运行时目录（Codex 尤为明显）。第一次运行若报 `Operation not permitted` 或被沙箱拒绝，**用同一命令带 `sandbox_permissions: danger-full-access` 重试一次**（会弹出授权给用户确认）；不要反复用普通权限重试。
-- **未安装**：脚本会报错并附安装命令——把安装命令转告用户，征得同意前不要替用户安装 CLI。
+- **未安装**：先跑 `doctor` 看哪些 CLI 可用；脚本报错也会附安装命令——把安装命令转告用户，征得同意前不要替用户安装 CLI。
 - **Codex 报「不信任目录」**：把 `CONDUCTOR_CWD=/path/to/git/repo` 写进 `~/.dsh/secrets/media-tools.env`（或环境变量），指向受信任的 git 仓库。
 - **失败重试**：先读报错定位原因（未登录 / 未安装 / 网络 / 任务描述不清），修正任务文本后重派一次；同一失败不要连试三次以上。
 - **配额透明**：派活消耗的是对方 CLI 的登录额度（如 Codex 订阅），派之前任务必须明确、值得跑，不派无意义的小事。

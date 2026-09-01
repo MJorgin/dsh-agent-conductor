@@ -27,6 +27,7 @@ DeepSeek Harness is a great reasoning engine — but sometimes the job is better
 |---|---|---|
 | 🧠 Auto-triggered dispatch | Say "have Codex translate this README" — the model matches the skill, runs the dispatch script, and answers from the result | Free (uses the target CLI's quota) |
 | 🔧 `conductor_dispatch` tool (optional bundle) | The same registry as a first-class DSH tool, installed into a profile with one command | Free |
+| 🩺 `doctor` self-check | `python3 dispatch.py doctor` probes which CLIs are installed (resolves PATH + tries `--version`) before you dispatch | Free |
 | 👥 11 agent CLIs | Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok | Their login quotas |
 | 🔒 Privacy | Task text goes only to the CLI's own provider; keys stay local | — |
 
@@ -61,15 +62,31 @@ The agent auto-recognizes the need (SKILL.md description matching) → runs `dis
 ## 🛠️ Prereqs: install the CLIs you want to dispatch to
 
 ```sh
-# Codex (symlink to PATH when you already have codex-cli)
-ln -s ~/.codex/plugins/.plugin-appserver/codex ~/.local/bin/codex
-# Claude Code / OpenCode
+# Codex / Claude Code / OpenCode / Gemini / Qwen
+npm i -g @openai/codex
 npm i -g @anthropic-ai/claude-code
 npm i -g opencode-ai
+npm i -g @google/gemini-cli
+npm i -g @qwen-code/qwen-code
+# Kimi / Grok / Copilot (headless flags verified against each CLI's own --help)
+npm i -g @moonshot-ai/kimi-code
+npm i -g @xai-official/grok
+npm i -g @github/copilot
 # TraeCode CLI: https://docs.trae.cn/cli_command-line-parameters
+# (already have codex-cli? symlink instead: ln -s ~/.codex/plugins/.plugin-appserver/codex ~/.local/bin/codex)
 ```
 
-> Codex requires a trusted git repo as its working directory: write `CONDUCTOR_CWD=/path/to/git/repo` into `~/.dsh/secrets/media-tools.env` (or export it). The skill script and the bundle tool both honor it, falling back to the current working directory.
+> Headless note: Copilot non-interactive mode must auto-approve tools, so the registry runs `copilot -p "<task>" --allow-all-tools`. The other CLIs run their standard print/headless flag.
+
+Then check what's actually dispatchable on this machine:
+
+```sh
+python3 skills/conductor/scripts/dispatch.py doctor
+# ✅ Codex  …/codex — codex-cli 0.151.0 …
+# ❌ Gemini … 未找到 `gemini`  →  安装：npm i -g @google/gemini-cli
+```
+
+> **Working directory is auto-detected.** The bundle tool runs each CLI in the current session's workspace (`exec.agent.session.header.cwd`), then `CONDUCTOR_CWD`, then the harness cwd — no hardcoded paths. Codex still requires a *trusted* git repo: point `CONDUCTOR_CWD=/path/to/git/repo` (env or `~/.dsh/secrets/media-tools.env`) at one if the auto-detected folder isn't trusted. The skill script honors `CONDUCTOR_CWD` and falls back to the current directory.
 > To let the dispatched agent write files: add `sandbox_mode = "workspace-write"` to Codex's `~/.codex/config.toml`.
 > Dispatching consumes the target CLI's login quota.
 
@@ -78,10 +95,18 @@ npm i -g opencode-ai
 | CLI | Headless command | Status |
 |---|---|---|
 | Codex | `codex exec "{task}"` | ✅ field-tested (translation task delivered) |
-| Claude Code | `claude -p "{task}" --output-format text` | ✅ per official docs |
+| Claude Code | `claude -p "{task}" --output-format text` | ✅ installed; per official docs |
 | TraeCode | `traecli exec "{task}"` | ✅ per official docs |
 | OpenCode | `opencode run "{task}"` | ✅ per official docs |
-| Gemini / Cursor / Kimi / Qwen / Copilot / WorkBuddy / Grok | see the `dispatch.py` registry | ⏳ command shape pending field test |
+| Gemini CLI | `gemini -p "{task}"` | ✅ per official docs |
+| Qwen Code | `qwen --prompt "{task}"` | ✅ per official docs (Gemini-CLI fork) |
+| Kimi CLI | `kimi --prompt "{task}"` | ✅ flag confirmed from the CLI's own help (`-p, --prompt` = non-interactive) |
+| Copilot CLI | `copilot -p "{task}" --allow-all-tools` | ✅ flag confirmed from `copilot --help` (bin is `copilot`, not `github-copilot`; `--allow-all-tools` is required headless) |
+| Grok CLI | `grok -p "{task}"` | ✅ per official README (`grok -p "..."` = run one task) |
+| Cursor CLI | `cursor-agent -p "{task}"` | ⏳ command shape pending field test (install via cursor.com; the npm `cursor-agent` package is unrelated) |
+| WorkBuddy | `workbuddy -p "{task}"` | ⏳ command shape pending field test |
+
+> Install packages were verified against the npm registry: Kimi is `@moonshot-ai/kimi-code` (bin `kimi`), Grok is `@xai-official/grok` (bin `grok`), Copilot is `@github/copilot` (bin `copilot`), Codex is `@openai/codex`. The `kimi-cli` npm package is an unrelated placeholder with no binary — do not use it.
 
 ## 📦 Optional: bundle install (host-only tool)
 
@@ -91,8 +116,9 @@ This repo is also a **host-only** dsh bundle (declares `dsh.bundle`, **zero clie
 dsh plugin --profile web add github:MJorgin/dsh-agent-conductor
 ```
 
-- The tool and the skill share the same CLI registry (`index.js` ⇄ `dispatch.py` — keep them in sync when adding CLIs);
+- The tool and the skill share the same CLI registry (`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py` — keep the three in sync when adding CLIs);
 - No client half, so the Web UI is never affected (the early panel-carrying client version was removed — see git log);
+- Hardened host execution: explicitly declares the `subprocess` dependency, enforces a real 10-minute timeout that **terminates the whole process tree** (also on cancel — no orphaned CLIs), and clips over-long output (head + tail, ~20k chars) so a chatty agent can't blow up the context;
 - Panels / task-board recycling are on the roadmap.
 
 ## 📂 Repo layout
