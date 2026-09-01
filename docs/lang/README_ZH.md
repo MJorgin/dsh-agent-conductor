@@ -55,7 +55,15 @@ npm i -g opencode-ai
 # TraeCode CLI：https://docs.trae.cn/cli_command-line-parameters
 ```
 
-> Codex 要求在受信任的 git 仓库运行：把 `CONDUCTOR_CWD=/path/to/git/repo` 写进 `~/.dsh/secrets/media-tools.env`（或导出环境变量）。Skill 脚本与 bundle 工具都读取它，缺省时用当前工作目录。
+装完先自检，看本机到底能派谁（解析 PATH + 试跑版本号）：
+
+```sh
+python3 skills/conductor/scripts/dispatch.py doctor
+# ✅ Codex  …/codex — codex-cli 0.151.0 …
+# ❌ Gemini … 未找到 `gemini`  →  安装：npm i -g @google/gemini-cli
+```
+
+> **工作目录自动识别。** bundle 工具会让 CLI 在当前会话工作区（`exec.agent.session.header.cwd`）里跑，其次读 `CONDUCTOR_CWD`，再次用宿主 cwd——不再写死任何路径。Codex 仍要求**受信任**的 git 仓库：若自动识别到的目录不被信任，就把 `CONDUCTOR_CWD=/path/to/git/repo` 写进 `~/.dsh/secrets/media-tools.env`（或导出环境变量）。Skill 脚本读 `CONDUCTOR_CWD`，缺省用当前目录。
 > 想让派出的 agent 能写文件：Codex 的 `~/.codex/config.toml` 加 `sandbox_mode = "workspace-write"`。
 > 派活消耗对方 CLI 的登录额度。
 
@@ -77,8 +85,9 @@ npm i -g opencode-ai
 dsh plugin --profile web add github:MJorgin/dsh-agent-conductor
 ```
 
-- 工具与技能共用同一份 CLI 注册表（`index.js` ⇄ `dispatch.py`，新增 CLI 时保持同步）；
+- 工具、动态插件与技能三处共用同一份 CLI 注册表（`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py`，新增 CLI 时保持同步）；
 - 无 client 半边，不影响 Web UI（早期带面板的客户端版本因此移除，见 git log）；
+- 宿主执行更稳：显式声明 `subprocess` 依赖；真正的 10 分钟超时会**终止整个进程树**（取消时同样清理，不留孤儿进程）；超长输出自动截断（保留头+尾，约 2 万字符），避免话痨 agent 撑爆上下文；
 - 面板/任务看板回收等功能走路线图，另行实现。
 
 ## 仓库内容

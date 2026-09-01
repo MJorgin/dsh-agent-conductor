@@ -27,6 +27,7 @@ DeepSeek Harness is a great reasoning engine — but sometimes the job is better
 |---|---|---|
 | 🧠 Auto-triggered dispatch | Say "have Codex translate this README" — the model matches the skill, runs the dispatch script, and answers from the result | Free (uses the target CLI's quota) |
 | 🔧 `conductor_dispatch` tool (optional bundle) | The same registry as a first-class DSH tool, installed into a profile with one command | Free |
+| 🩺 `doctor` self-check | `python3 dispatch.py doctor` probes which CLIs are installed (resolves PATH + tries `--version`) before you dispatch | Free |
 | 👥 11 agent CLIs | Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok | Their login quotas |
 | 🔒 Privacy | Task text goes only to the CLI's own provider; keys stay local | — |
 
@@ -69,7 +70,15 @@ npm i -g opencode-ai
 # TraeCode CLI: https://docs.trae.cn/cli_command-line-parameters
 ```
 
-> Codex requires a trusted git repo as its working directory: write `CONDUCTOR_CWD=/path/to/git/repo` into `~/.dsh/secrets/media-tools.env` (or export it). The skill script and the bundle tool both honor it, falling back to the current working directory.
+Then check what's actually dispatchable on this machine:
+
+```sh
+python3 skills/conductor/scripts/dispatch.py doctor
+# ✅ Codex  …/codex — codex-cli 0.151.0 …
+# ❌ Gemini … 未找到 `gemini`  →  安装：npm i -g @google/gemini-cli
+```
+
+> **Working directory is auto-detected.** The bundle tool runs each CLI in the current session's workspace (`exec.agent.session.header.cwd`), then `CONDUCTOR_CWD`, then the harness cwd — no hardcoded paths. Codex still requires a *trusted* git repo: point `CONDUCTOR_CWD=/path/to/git/repo` (env or `~/.dsh/secrets/media-tools.env`) at one if the auto-detected folder isn't trusted. The skill script honors `CONDUCTOR_CWD` and falls back to the current directory.
 > To let the dispatched agent write files: add `sandbox_mode = "workspace-write"` to Codex's `~/.codex/config.toml`.
 > Dispatching consumes the target CLI's login quota.
 
@@ -91,8 +100,9 @@ This repo is also a **host-only** dsh bundle (declares `dsh.bundle`, **zero clie
 dsh plugin --profile web add github:MJorgin/dsh-agent-conductor
 ```
 
-- The tool and the skill share the same CLI registry (`index.js` ⇄ `dispatch.py` — keep them in sync when adding CLIs);
+- The tool and the skill share the same CLI registry (`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py` — keep the three in sync when adding CLIs);
 - No client half, so the Web UI is never affected (the early panel-carrying client version was removed — see git log);
+- Hardened host execution: explicitly declares the `subprocess` dependency, enforces a real 10-minute timeout that **terminates the whole process tree** (also on cancel — no orphaned CLIs), and clips over-long output (head + tail, ~20k chars) so a chatty agent can't blow up the context;
 - Panels / task-board recycling are on the roadmap.
 
 ## 📂 Repo layout
