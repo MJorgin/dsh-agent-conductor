@@ -88,7 +88,7 @@ def doctor():
         for flag in ("--version", "-v", "version"):
             try:
                 r = subprocess.run([binary, flag], capture_output=True, text=True,
-                                   timeout=6)
+                                   encoding='utf-8', errors='replace', timeout=6)
                 line = (r.stdout or r.stderr).strip().splitlines()
                 ver = (line[0] if line else "").strip()[:60]
                 if ver:
@@ -113,8 +113,16 @@ def main():
         sys.exit("任务不能为空")
     cwd = load_conf("CONDUCTOR_CWD") or os.getcwd()
     argv = [a.replace("{task}", task) for a in agent["argv"]]
+    # Optional per-call model override (codex: config.toml default may not exist in account — use `exec -m`)
+    if agent_id == "codex":
+        override = load_conf("CONDUCTOR_CODEX_MODEL")
+        if override:
+            argv = [argv[0], "exec", "-m", override, argv[-1]]
+    resolved = shutil.which(argv[0])  # Windows: PATHEXT resolve (.CMD/.BAT) — subprocess.run won't do it
+    if resolved:
+        argv[0] = resolved
     try:
-        proc = subprocess.run(argv, capture_output=True, text=True, cwd=cwd, timeout=600)
+        proc = subprocess.run(argv, capture_output=True, text=True, encoding='utf-8', errors='replace', cwd=cwd, timeout=600)
     except FileNotFoundError:
         sys.exit(f"{agent['name']} 未安装（或不在 PATH）。安装：{agent['install']}（可先运行 dispatch.py doctor）")
     except subprocess.TimeoutExpired:
