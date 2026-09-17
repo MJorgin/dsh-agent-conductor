@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="../../docs/social-preview.png" alt="dsh-agent-conductor — DSH 指挥家" width="100%">
+<img src="../../docs/hero.png" alt="dsh-agent-conductor — one DeepSeek Harness session dispatching to 11 external agent CLIs" width="100%">
 
 # ⚡ dsh-agent-conductor · DSH 指挥家
 
