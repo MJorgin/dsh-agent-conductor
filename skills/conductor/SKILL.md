@@ -15,6 +15,12 @@ description: "派活给外部 agent CLI（DSH 指挥家）。当用户想让另�
 python3 scripts/dispatch.py doctor
 ```
 
+首次使用某个 CLI、任务较长、或任务可能产生写入时，先预览（不消耗对方额度）：
+
+```bash
+python3 scripts/dispatch.py --dry-run <agent> "<任务>"
+```
+
 正式派活：
 
 ```bash
@@ -25,6 +31,7 @@ python3 scripts/dispatch.py <agent> "<任务>"
 - 任务必须**自包含**：对方看不到本会话的任何上下文，背景、约束、期望产出全部写进任务文本。
 - 结果直接打印到 stdout，作为回答依据；不要复述"我派了活"，直接给用户交付结论。
 - 一次派一件；多件事按依赖顺序分多次派。
+- Dry-run 只用于核对目标、工作目录和参数；确认无误后再正式派活。
 
 ## 规则
 

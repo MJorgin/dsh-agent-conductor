@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Python tests
+        run: python3 -m unittest discover -s tests -v
+
+      - name: Bundle syntax
+        run: node --check index.js
+
+      - name: Dynamic plugin syntax
+        run: node -e "const fs=require('node:fs'); new Function(fs.readFileSync('conductor-dynamic.js','utf8')); console.log('dynamic: syntax ok')"

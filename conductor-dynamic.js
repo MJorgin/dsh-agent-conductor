@@ -27,10 +27,34 @@ return {
       { id: 'grok', name: 'Grok CLI', argv: ['grok', '-p', '{task}'], install: 'npm i -g @xai-official/grok' },
     ]
 
+    const shellQuote = (part) => {
+      if (/^[A-Za-z0-9_./=-]+$/.test(part)) return part
+      return `'${part.replaceAll("'", "'\\''")}'`
+    }
+    const resolveCwd = (exec) => {
+      const sessionCwd = exec?.agent?.session?.header?.cwd
+      const hasProcess = typeof process !== 'undefined'
+      return (typeof sessionCwd === 'string' && sessionCwd.trim())
+        || (hasProcess && process.env.CONDUCTOR_CWD?.trim())
+        || (hasProcess && process.cwd())
+        || '.'
+    }
+    const renderPlan = ({ agent, task, cwd, argv }) => [
+      'Conductor Dry-run · 调度预览（未执行）',
+      `  Target agent    : ${agent.name}`,
+      `  Working dir     : ${cwd}`,
+      `  Arguments       : ${JSON.stringify(argv)}`,
+      `  Shell-equivalent: ${argv.map(shellQuote).join(' ')}`,
+      `  Task length     : ${task.length} chars`,
+      '  Safety          : argv is passed directly; no shell is used',
+      '',
+      '确认目标、工作目录和任务无误后，将 dryRun 设为 false 正式派活。',
+    ].join('\n')
+
     const tool = harness.defineTool({
       name: 'conductor_dispatch',
       description:
-        '派一件自包含的任务给外部 agent CLI（Codex、Claude Code、TraeCode、OpenCode、Gemini、Cursor、Kimi、Qwen、Copilot、WorkBuddy、Grok）在无头模式下执行，并把结果带回会话。CLI 未安装或未登录时会报错并附安装提示。适合：让另一家的编码代理做独立的研究、实现或分析。执行消耗对应 CLI 的登录额度。',
+        '派一件自包含的任务给外部 agent CLI（Codex、Claude Code、TraeCode、OpenCode、Gemini、Cursor、Kimi、Qwen、Copilot、WorkBuddy、Grok）在无头模式下执行，并把结果带回会话；支持 dryRun 先预览目标、工作目录和命令。CLI 未安装或未登录时会报错并附安装提示。适合：让另一家的编码代理做独立的研究、实现或分析。执行消耗对应 CLI 的登录额度。',
       parameters: {
         type: 'object',
         properties: {
@@ -39,6 +63,7 @@ return {
             description: '目标 CLI 的 id：codex / claude-code / trae / opencode / gemini / cursor / kimi / qwen / copilot / workbuddy / grok',
           },
           task: { type: 'string', description: '完整的自包含任务描述（对方看不到本会话上下文）。' },
+          dryRun: { type: 'boolean', description: 'true 时只返回调度预览，不启动外部 CLI。' },
         },
         required: ['agent', 'task'],
       },
@@ -51,7 +76,7 @@ return {
       presentCall: (args) => ({
         card: 'generic',
         title: `指挥家 → ${args?.agent ?? '?'}`,
-        kind: 'execute',
+        kind: args?.dryRun === true ? 'read' : 'execute',
         rawInput: args,
       }),
       async execute(args, exec) {
@@ -62,11 +87,11 @@ return {
         if (!agent) {
           throw new Error(`未知 agent "${args.agent}"；可用：${AGENTS.map((e) => e.id).join(', ')}`)
         }
-        const subprocess = ctx.get('subprocess')
-        if (!subprocess) {
-          throw new Error('宿主 subprocess 服务不可用')
-        }
         const argv = agent.argv.map((a) => a.split('{task}').join(args.task))
+        if (args.dryRun === true) {
+          const plannedCwd = resolveCwd(exec)
+          return renderPlan({ agent, task: args.task, cwd: plannedCwd, argv })
+        }
         // Work directory: the current session's workspace first (Codex needs a
         // trusted git repo), then CONDUCTOR_CWD / harness cwd. No hardcoded path.
         const sessionCwd = exec?.agent?.session?.header?.cwd
@@ -75,6 +100,10 @@ return {
           || (hasProcess && process.env && process.env.CONDUCTOR_CWD && process.env.CONDUCTOR_CWD.trim())
           || (hasProcess && process.cwd && process.cwd())
           || '.'
+        const subprocess = ctx.get('subprocess')
+        if (!subprocess) {
+          throw new Error('宿主 subprocess 服务不可用')
+        }
         let child
         try {
           child = subprocess.spawn({

@@ -16,6 +16,12 @@
 
 > 灵感来自 [Multica](https://github.com/multica-ai/multica)——把"agent 小队"概念做成一个零安装成本的 DSH 技能。
 
+## 🎯 什么时候该用 Conductor
+
+- **独立第二意见**：让 Codex、Claude Code 或 Gemini 审同一个方案，再比较它们的判断。
+- **老代码排查**：一个 Agent 追调用链，另一个查风险、回归影响和迁移方案。
+- **跨模型实现**：选择更适合当前任务的模型或工具链，把最终结果带回 DSH。
+
 ## ✨ 你能得到什么
 
 | 能力 | 做什么 | 成本 |
@@ -23,6 +29,7 @@
 | 🧠 自动识别、自动派活 | 说一句「让 Codex 把这份 README 翻译一下」——模型匹配到本 skill，执行派发脚本，照着结果回答 | 免费（消耗目标 CLI 自己的额度） |
 | 🔧 `conductor_dispatch` 工具（可选 bundle） | 同一套注册表，以 DSH 一等公民工具的形式提供，一条命令装进 profile | 免费 |
 | 🩺 `doctor` 自检 | `python3 dispatch.py doctor` 先探测你装了哪些 CLI（解析 PATH + 试跑 `--version`），再决定派给谁 | 免费 |
+| 👀 Dry-run 预览 | 不启动外部 Agent，先查看目标、工作目录、argv 和等价 shell 命令 | 免费 |
 | 👥 11 种 agent CLI | Codex、Claude Code、TraeCode、OpenCode、Gemini、Cursor、Kimi、Qwen、Copilot、WorkBuddy、Grok | 各自 CLI 的登录额度 |
 | 🔒 隐私 | 任务文本只发给目标 CLI 自己的服务方；密钥始终留在本地 | — |
 
@@ -35,7 +42,7 @@
 | 风险 | 需要重启、与宿主耦合 | 会话级、重启消失 | 只读脚本，宿主无感 |
 | 结果 | 工具结果 | 工具结果 | **stdout 直接成为回答依据** |
 
-一个 `SKILL.md` + 一个 90 行的 `dispatch.py`（Python 标准库，零依赖），完事。
+一个 `SKILL.md` + 一个零依赖 `dispatch.py`（Python 标准库），完事。
 
 ## 安装（Skill 版）
 
@@ -53,6 +60,55 @@ cp -R skills/conductor/. .dsh/skills/conductor/
 - 「用 Codex 独立实现一个 XXX」
 
 agent 会**自动识别**（SKILL.md 描述匹配）→ 执行 `dispatch.py` → 结果回传。
+
+第一次使用某个 CLI、任务很长、或可能产生文件写入时，先预览；这一步不会消耗目标 Agent 额度：
+
+```sh
+python3 skills/conductor/scripts/dispatch.py --dry-run claude-code "阅读 src/auth.ts，解释 token 刷新流程。不要修改文件。"
+```
+
+## 🧭 Agent 能力矩阵
+
+| 任务 | 优先考虑 | 原因 |
+|---|---|---|
+| 架构评审 / 第二意见 | Codex、Claude Code、Gemini | 不同推理风格更容易发现设计盲区 |
+| 老代码调用链排查 | Claude Code、Codex、Copilot | 适合追踪仓库内依赖，并附上证据 |
+| GitHub Issue / Actions 分析 | Copilot、Codex | 与仓库、PR、CI 诊断的场景贴合 |
+| 与编辑器联动的重构 | Cursor、Codex | 适合和现有项目树紧密耦合的工作流 |
+| 中文本地化 / 中文文档 | TraeCode、Qwen、Kimi、Codex | 中文能力选择较多；任务里要统一术语 |
+| 快速替代实现 / 小规模 Spike | OpenCode、Qwen、Kimi | 适合边界清楚、可使用独立账号或工具链的尝试 |
+
+这张表是路由起点，不是硬性规则。优先选择已经安装、已登录，并且能访问正确工作区的 CLI。
+
+## 📋 可直接复制的派活模板
+
+1. 安全诊断：
+
+```text
+你正在当前仓库中排查一个 bug。不要修改文件。
+根据下面的描述复现问题：<粘贴错误和复现步骤>。
+只阅读必要文件。返回：
+1）根因；2）file:line 证据；3）三个按优先级排序的修复方案；
+4）应该新增或更新的测试。
+```
+
+2. 独立架构评审：
+
+```text
+请以外部资深工程师视角评审这个设计，不要假设存在隐藏上下文。
+设计摘要：<粘贴 PRD 或技术方案>。
+重点挑战可扩展性、失败模式、安全边界和迁移风险。
+先列出你不同意的点；每一点都要包含影响、证据和备选方案。
+```
+
+3. 有测试兜底的实现：
+
+```text
+请在当前仓库实现这个改动：<范围和验收标准>。
+小步推进。实际可行时，先新增或更新测试。
+结束前运行相关测试命令，并汇报：
+修改文件、测试结果、剩余风险和后续事项。
+```
 
 ## 前置：想派谁就装谁的 CLI
 
@@ -113,7 +169,7 @@ dsh plugin --profile web add github:MJorgin/dsh-agent-conductor
 
 - 工具、动态插件与技能三处共用同一份 CLI 注册表（`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py`，新增 CLI 时保持同步）；
 - 无 client 半边，不影响 Web UI（早期带面板的客户端版本因此移除，见 git log）；
-- 宿主执行更稳：显式声明 `subprocess` 依赖；真正的 10 分钟超时会**终止整个进程树**（取消时同样清理，不留孤儿进程）；超长输出自动截断（保留头+尾，约 2 万字符），避免话痨 agent 撑爆上下文；
+- 宿主执行更稳：支持 Dry-run 预览；显式声明 `subprocess` 依赖；真正的 10 分钟超时会**终止整个进程树**（取消时同样清理，不留孤儿进程）；超长输出自动截断（保留头+尾，约 2 万字符），避免话痨 agent 撑爆上下文；
 - 面板/任务看板回收等功能走路线图，另行实现。
 
 ## 仓库内容
@@ -128,6 +184,8 @@ conductor-dynamic.js           # 备选：动态插件版（cordis_define 路线
 
 ## 路线图
 
+- [x] `doctor` 健康检查和 Dry-run 预览
+- [ ] 按能力、速度和成本选择 Agent
 - [ ] 面板 UI（可选，动态插件 client 半边）
 - [ ] 任务看板回收：派活结果写入 dsh-task-board 卡片
 - [ ] 小队编排：一个任务分发给多个 agent 汇总（Multica squads 形态）

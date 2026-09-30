@@ -7,6 +7,7 @@
 ### *Let your DeepSeek Harness agent dispatch tasks to 11 external agent CLIs — Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok — headlessly, and bring results back into the conversation.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![CI](https://github.com/MJorgin/dsh-agent-conductor/actions/workflows/ci.yml/badge.svg)](https://github.com/MJorgin/dsh-agent-conductor/actions/workflows/ci.yml)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4D6BFE)](https://github.com/topics/dsh-plugin)
 [![Zero deps](https://img.shields.io/badge/deps-zero-2EA44F)](skills/conductor/scripts/dispatch.py)
 [![Agents](https://img.shields.io/badge/agents-11-blue)](README.md#-agents)
@@ -21,6 +22,12 @@ DeepSeek Harness is a great reasoning engine — but sometimes the job is better
 
 > Inspired by [Multica](https://github.com/multica-ai/multica) — the "agent squad" idea as a zero-install DSH skill.
 
+## 🎯 When to use Conductor
+
+- **Independent second opinion:** ask Codex, Claude Code, or Gemini to review the same design and compare their reasoning.
+- **Legacy-code investigation:** have one agent trace a call chain while another checks risks, regressions, and migration options.
+- **Cross-model implementation:** use an agent whose toolchain or model fits the job, then bring its result back to DSH.
+
 ## ✨ What you get
 
 | Capability | What it does | Cost |
@@ -28,6 +35,7 @@ DeepSeek Harness is a great reasoning engine — but sometimes the job is better
 | 🧠 Auto-triggered dispatch | Say "have Codex translate this README" — the model matches the skill, runs the dispatch script, and answers from the result | Free (uses the target CLI's quota) |
 | 🔧 `conductor_dispatch` tool (optional bundle) | The same registry as a first-class DSH tool, installed into a profile with one command | Free |
 | 🩺 `doctor` self-check | `python3 dispatch.py doctor` probes which CLIs are installed (resolves PATH + tries `--version`) before you dispatch | Free |
+| 👀 Dry-run preview | Preview the target, working directory, argv, and shell-equivalent command without starting an external agent | Free |
 | 👥 11 agent CLIs | Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok | Their login quotas |
 | 🔒 Privacy | Task text goes only to the CLI's own provider; keys stay local | — |
 
@@ -40,7 +48,7 @@ DeepSeek Harness is a great reasoning engine — but sometimes the job is better
 | Risk | touches the host | session-scoped, gone on restart | read-only script, host-agnostic |
 | Result | tool result | tool result | **stdout directly becomes the answer** |
 
-One `SKILL.md` + a ~90-line zero-dependency `dispatch.py` (Python stdlib only).
+One `SKILL.md` + a zero-dependency `dispatch.py` (Python stdlib only).
 
 ## ⚡ Quick start (Skill)
 
@@ -58,6 +66,55 @@ No restart needed — from the next message on, just say:
 - "用 Codex 独立实现一个 XXX" (have Codex implement XXX independently)
 
 The agent auto-recognizes the need (SKILL.md description matching) → runs `dispatch.py` → returns the result.
+
+Before an unfamiliar or potentially write-producing dispatch, preview it without consuming the target agent's quota:
+
+```sh
+python3 skills/conductor/scripts/dispatch.py --dry-run claude-code "Read src/auth.ts and explain the token refresh flow. Do not edit files."
+```
+
+## 🧭 Agent capability matrix
+
+| Task | First choices | Why |
+|---|---|---|
+| Architecture review / second opinion | Codex, Claude Code, Gemini | Different reasoning styles are useful for catching design blind spots |
+| Legacy-code call-chain investigation | Claude Code, Codex, Copilot | Good for tracing repository-local dependencies and attaching evidence |
+| GitHub-centric issue or Actions analysis | Copilot, Codex | Natural fit for repositories, pull requests, and CI diagnostics |
+| Editor-coupled refactor | Cursor, Codex | Useful when the workflow is tightly connected to an existing project tree |
+| Chinese localization / Chinese docs | TraeCode, Qwen, Kimi, Codex | Strong Chinese-language options; keep terminology consistent in the task |
+| Fast alternative implementation | OpenCode, Qwen, Kimi | Useful for bounded spikes where a separate login/toolchain is available |
+
+The matrix is a routing starting point, not a hard rule. Prefer an installed, logged-in CLI that has access to the correct workspace.
+
+## 📋 Copy-ready dispatch recipes
+
+1. Safe diagnosis:
+
+```text
+You are investigating a bug in the current repository. Do not edit files.
+Reproduce the issue from this description: <paste error and steps>.
+Read only the minimum relevant files. Return:
+1) root cause, 2) evidence with file:line, 3) three ranked fix options,
+4) tests that should be added or updated.
+```
+
+2. Independent architecture review:
+
+```text
+Review this design as an outside staff engineer. Do not assume hidden context.
+Design summary: <paste PRD/technical plan>.
+Challenge scalability, failure modes, security boundaries, and migration risk.
+Return disagreements first; for each, include impact, evidence, and a fallback.
+```
+
+3. Test-backed implementation:
+
+```text
+Implement this change in the current repository: <scope and acceptance criteria>.
+Work in small steps. Add or update tests first where practical.
+Before finishing, run the relevant test command and report:
+files changed, tests run, remaining risks, and follow-up work.
+```
 
 ## 🛠️ Prereqs: install the CLIs you want to dispatch to
 
@@ -118,7 +175,7 @@ dsh plugin --profile web add github:MJorgin/dsh-agent-conductor
 
 - The tool and the skill share the same CLI registry (`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py` — keep the three in sync when adding CLIs);
 - No client half, so the Web UI is never affected (the early panel-carrying client version was removed — see git log);
-- Hardened host execution: explicitly declares the `subprocess` dependency, enforces a real 10-minute timeout that **terminates the whole process tree** (also on cancel — no orphaned CLIs), and clips over-long output (head + tail, ~20k chars) so a chatty agent can't blow up the context;
+- Hardened host execution: supports dry-run previews, explicitly declares the `subprocess` dependency, enforces a real 10-minute timeout that **terminates the whole process tree** (also on cancel — no orphaned CLIs), and clips over-long output (head + tail, ~20k chars) so a chatty agent can't blow up the context;
 - Panels / task-board recycling are on the roadmap.
 
 ## 📂 Repo layout
@@ -133,6 +190,8 @@ conductor-dynamic.js           # alternative: dynamic-plugin edition (cordis_def
 
 ## 🗺️ Roadmap
 
+- [x] `doctor` health check and dry-run preview
+- [ ] Routing by capability, speed, and cost
 - [ ] Panel UI (optional, dynamic-plugin client half)
 - [ ] Task-board recycling: dispatch results written back to dsh-task-board cards
 - [ ] Squad orchestration: one task fanned out to several agents and merged (Multica squads shape)

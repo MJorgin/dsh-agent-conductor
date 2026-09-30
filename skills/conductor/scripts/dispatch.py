@@ -3,6 +3,8 @@
 
 用法:
   python3 dispatch.py <agent> "<任务>"     派活给某个 agent CLI
+  python3 dispatch.py --dry-run <agent> "<任务>"
+                                         预览目标、工作目录和命令，不实际执行
   python3 dispatch.py doctor               自检：哪些 agent CLI 已安装/可用
   python3 dispatch.py list                 同 doctor
 
@@ -12,7 +14,7 @@
 CONDUCTOR_CWD=/path/to/git/repo —— 派活的工作目录（Codex 要求在受信任的
 git 仓库里运行）。不配置时默认当前目录（通常就是会话工作区）。
 """
-import os, shutil, subprocess, sys
+import os, shlex, shutil, subprocess, sys
 from pathlib import Path
 
 MAX_OUTPUT_CHARS = 20_000
@@ -53,6 +55,29 @@ AGENTS = {
                      "install": "npm i -g @xai-official/grok（或 curl -fsSL https://x.ai/cli/install.sh | bash）"},
 }
 
+def resolve_binary(cfg):
+    """Resolve the configured executable without invoking it."""
+    binary = cfg.get("bin", cfg["argv"][0])
+    return shutil.which(binary) or shutil.which(cfg["argv"][0])
+
+def render_plan(agent_id, cfg, task, cwd):
+    """Render a dispatch preview without contacting the agent provider."""
+    argv = [a.replace("{task}", task) for a in cfg["argv"]]
+    resolved = resolve_binary(cfg)
+    print("Conductor Dry-run · 调度预览（未执行）")
+    print(f"  Target agent    : {cfg['name']} ({agent_id})")
+    print(f"  Working dir     : {cwd}")
+    print(f"  Executable      : {resolved or 'NOT FOUND'}")
+    print(f"  Arguments       : {argv}")
+    print(f"  Shell-equivalent: {shlex.join(argv)}")
+    print(f"  Task length     : {len(task)} chars")
+    print("  Safety          : argv is passed directly; no shell is used")
+    if not resolved:
+        print(f"  Install         : {cfg['install']}")
+        return 1
+    print("\n确认目标、工作目录和任务无误后，去掉 --dry-run 正式派活。")
+    return 0
+
 def load_conf(name):
     v = os.environ.get(name)
     if v:
@@ -75,15 +100,14 @@ def clip(text, cap=MAX_OUTPUT_CHARS):
 def doctor():
     """Probe which agent CLIs are resolvable on PATH (best-effort version check)."""
     print("Conductor 自检：在 PATH 上探测各 agent CLI\n")
+    available = 0
     for aid, cfg in AGENTS.items():
         binary = cfg.get("bin", cfg["argv"][0])
-        path = shutil.which(binary)
-        if path is None:
-            # fall back to the first argv token in case `bin` differs
-            path = shutil.which(cfg["argv"][0])
+        path = resolve_binary(cfg)
         if path is None:
             print(f"  ❌ {cfg['name']:<13} ({aid}) 未找到 `{binary}`  →  安装：{cfg['install']}")
             continue
+        available += 1
         ver = ""
         for flag in ("--version", "-v", "version"):
             try:
@@ -96,22 +120,34 @@ def doctor():
             except Exception:
                 continue
         print(f"  ✅ {cfg['name']:<13} ({aid}) {path}" + (f"  — {ver}" if ver else ""))
-    print("\n提示：列出 ✅ 的 CLI 才能派活；命令能找到但派活报错，多为未登录/未授权。")
+    print(f"\n可用 {available} / 不可用 {len(AGENTS) - available}")
+    print("提示：列出 ✅ 的 CLI 才能派活；命令能找到但派活报错，多为未登录/未授权。")
 
 def main():
     if len(sys.argv) < 2:
         sys.exit("用法: dispatch.py <agent> \"<任务>\"  |  doctor（自检已安装 CLI）\n"
                  "agent 可选: " + ", ".join(AGENTS))
-    if sys.argv[1] in ("doctor", "list", "--list", "-l"):
+    raw_args = sys.argv[1:]
+    if raw_args[0] in ("doctor", "list", "--list", "-l"):
         doctor()
         return
-    agent_id, task = sys.argv[1], " ".join(sys.argv[2:])
+    dry_run = raw_args[0] in ("plan", "--plan")
+    if dry_run:
+        raw_args = raw_args[1:]
+    if raw_args and raw_args[0] in ("--dry-run", "--plan"):
+        dry_run = True
+        raw_args = raw_args[1:]
+    if not raw_args:
+        sys.exit("Dry-run 用法: dispatch.py --dry-run <agent> \"<任务>\"")
+    agent_id, task = raw_args[0], " ".join(raw_args[1:])
     agent = AGENTS.get(agent_id)
     if not agent:
         sys.exit(f"未知 agent \"{agent_id}\"；可选: {', '.join(AGENTS)}（或运行 doctor 自检）")
     if not task.strip():
         sys.exit("任务不能为空")
     cwd = load_conf("CONDUCTOR_CWD") or os.getcwd()
+    if dry_run:
+        sys.exit(render_plan(agent_id, agent, task, cwd))
     argv = [a.replace("{task}", task) for a in agent["argv"]]
     try:
         proc = subprocess.run(argv, capture_output=True, text=True, cwd=cwd, timeout=600)
