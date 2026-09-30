@@ -30,4 +30,5 @@ jobs:
         run: node --check index.js
 
       - name: Dynamic plugin syntax
-        run: node -e "const fs=require('node:fs'); new Function(fs.readFileSync('conductor-dynamic.js','utf8')); console.log('dynamic: syntax ok')"
+        run: |
+          node -e "const fs = require('node:fs'); new Function(fs.readFileSync('conductor-dynamic.js', 'utf8')); console.log('dynamic syntax ok')"
