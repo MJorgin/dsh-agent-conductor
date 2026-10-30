@@ -170,8 +170,10 @@ python3 skills/conductor/scripts/dispatch.py doctor
 This repo is also a **host-only** dsh bundle (declares `dsh.bundle`, **zero client code** — the Web UI is untouched). One command installs the `conductor_dispatch` tool into a profile:
 
 ```sh
-dsh plugin --profile web add github:MJorgin/dsh-agent-conductor
+dsh plugin --profile web add dsh-agent-conductor
 ```
+
+Or straight from GitHub: `dsh plugin --profile web add github:MJorgin/dsh-agent-conductor`.
 
 - The tool and the skill share the same CLI registry (`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py` — keep the three in sync when adding CLIs);
 - No client half, so the Web UI is never affected (the early panel-carrying client version was removed — see git log);

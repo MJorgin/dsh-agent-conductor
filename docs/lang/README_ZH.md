@@ -164,7 +164,7 @@ python3 skills/conductor/scripts/dispatch.py doctor
 仓库同时是一个 **host-only** dsh bundle（声明 `dsh.bundle`、**无任何客户端代码**，不影响 Web UI），一条命令把 `conductor_dispatch` 工具装进 profile：
 
 ```sh
-dsh plugin --profile web add github:MJorgin/dsh-agent-conductor
+dsh plugin --profile web add dsh-agent-conductor
 ```
 
 - 工具、动态插件与技能三处共用同一份 CLI 注册表（`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py`，新增 CLI 时保持同步）；
