@@ -301,3 +301,12 @@ test('empty task cannot be opened as a dispatch draft', (t) => {
   assert.deepEqual(ui.calls, [])
   assert.deepEqual(ui.network, [])
 })
+
+test('Kimi and Qwen use the intended reference portraits', (t) => {
+  const ui = makeInteractionHarness({}, t)
+  const tree = ui.render()
+  const portrait = (name) => ui.descendants([ui.card(tree, name)])
+    .find((node) => node.type === 'img' && node.props.className === 'dshc-avatar-atlas')
+  assert.deepEqual(portrait('Kimi CLI').props.style, { left: '-300%', top: '-100%' })
+  assert.deepEqual(portrait('Qwen Code').props.style, { left: '-200%', top: '-100%' })
+})

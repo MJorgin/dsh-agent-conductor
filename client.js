@@ -252,7 +252,7 @@ window.__ModuleLoader__.load({
       { id: 'kimi', name: 'Kimi CLI', skin: '#ffd9c9', hair: '#d65f8f', suit: '#2b1120', accent: '#ffb3d1', gear: 'crown' },
       { id: 'qwen', name: 'Qwen Code', skin: '#ffdcc0', hair: '#7a4bd0', suit: '#1b1130', accent: '#c9b3ff', gear: 'horns' },
       { id: 'copilot', name: 'Copilot CLI', skin: '#ffd9b8', hair: '#2f4a7a', suit: '#0d1b33', accent: '#7fd0ff', gear: 'helmet' },
-      { id: 'workbuddy', name: 'WorkBuddy', skin: '#ffe0b0', hair: '#c9971f', suit: '#2b2208', accent: '#ffe08a', gear: 'bolt' },
+      { id: 'workbuddy', name: 'WorkBuddy', skin: '#ffe0b0', hair: '#62a983', suit: '#16372e', accent: '#a6e1b9', gear: 'bolt' },
       { id: 'grok', name: 'Grok CLI', skin: '#e8c7a6', hair: '#262626', suit: '#0c0c10', accent: '#9aa0a6', gear: 'scarf' },
     ]
 
@@ -511,14 +511,17 @@ window.__ModuleLoader__.load({
     /* ------------------------------ artwork ------------------------------ */
 
     function PanelIcon() {
+      // A compact naval cap: the same currentColor outline weight as the
+      // surrounding DSH navigation icons, with a small anchor at its centre.
       return h('svg', {
-        viewBox: '0 0 16 16', width: 16, height: 16, fill: 'none',
-        stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
+        viewBox: '0 0 24 24', width: 16, height: 16, fill: 'none',
+        stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round', strokeLinejoin: 'round',
         'aria-hidden': 'true',
       },
-        h('path', { d: 'M3 7.2 4.4 3.6C5.3 2.7 6.6 2.2 8 2.2s2.7.5 3.6 1.4L13 7.2' }),
-        h('path', { d: 'M2.3 7.4c1.7-.7 3.6-1 5.7-1s4 .3 5.7 1l-.6 2.1H2.9zM4 9.7v1.2c0 1.1 1.8 2.6 4 2.6s4-1.5 4-2.6V9.7' }),
-        h('path', { d: 'M7.1 4.6h1.8M8 3.8v1.6' }))
+        h('path', { d: 'M4.6 12 2.5 7.2c-.4-.9 0-1.7.9-2.1l4.5-2a10.2 10.2 0 0 1 8.2 0l4.5 2c.9.4 1.3 1.2.9 2.1L19.4 12' }),
+        h('path', { d: 'M4.6 12h14.8v2.4H4.6z' }),
+        h('path', { d: 'M4.6 14.4c-1.1.8-1.6 1.5-1.6 2.3 0 1.9 4 3.3 9 3.3s9-1.4 9-3.3c0-.8-.5-1.5-1.6-2.3' }),
+        h('path', { d: 'M12 5.7v4.5m-1.5-2.8h3M9.8 9.3c0 1.1 1 1.9 2.2 1.9s2.2-.8 2.2-1.9', strokeWidth: 1.45 }))
     }
 
     function CommanderMascot({ size = 92 }) {
@@ -637,7 +640,9 @@ window.__ModuleLoader__.load({
     function CrewAvatar({ crew, size = 46, status = 'idle' }) {
       const gear = avatarGear(crew.gear)
       const showEyes = true
-      const index = Math.max(0, CREW.findIndex((item) => item.id === crew.id))
+      // The reference portraits for Kimi and Qwen occupy each other's atlas cells.
+      const atlasId = crew.id === 'kimi' ? 'qwen' : crew.id === 'qwen' ? 'kimi' : crew.id
+      const index = Math.max(0, CREW.findIndex((item) => item.id === atlasId))
       return h('span', { className: 'dshc-avatar', style: { width: size, height: size }, role: 'img', 'aria-label': t('avatar.alt', { name: crew.name }) },
         h('svg', {
           viewBox: '0 0 64 64', width: size, height: size, 'aria-hidden': 'true',
