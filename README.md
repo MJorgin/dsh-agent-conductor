@@ -6,6 +6,8 @@
 
 ### *Let your DeepSeek Harness agent dispatch tasks to 11 external agent CLIs — Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok — headlessly, and bring results back into the conversation.*
 
+**New in 0.4.0:** the **大肥鱼指挥官 (Big Fat Fish Commander)** panel — a live, chibi-crewed fleet view of every dispatch, right in the DSH sidebar.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/MJorgin/dsh-agent-conductor/actions/workflows/ci.yml/badge.svg)](https://github.com/MJorgin/dsh-agent-conductor/actions/workflows/ci.yml)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-plugin-4D6BFE)](https://github.com/topics/dsh-plugin)
@@ -18,7 +20,7 @@
 
 ---
 
-DeepSeek Harness is a great reasoning engine — but sometimes the job is better done by *another* coding agent: a Codex translation, a Claude Code investigation, a Cursor refactor. This plugin lets your DSH agent **recognize when to delegate** (by skill-description matching), **dispatch a self-contained task** to one of 11 external agent CLIs in headless mode, and **bring the stdout result back as the answer**.
+DeepSeek Harness is a great reasoning engine — but sometimes the job is better done by *another* coding agent: a Codex translation, a Claude Code investigation, a Cursor refactor. This plugin lets your DSH agent **recognize when to delegate** (by skill-description matching), **dispatch a self-contained task** to one of 11 external agent CLIs in headless mode, and **bring the stdout result back as the answer** — while the **大肥鱼指挥官** panel shows the fleet's live status.
 
 > Inspired by [Multica](https://github.com/multica-ai/multica) — the "agent squad" idea as a zero-install DSH skill.
 
@@ -34,6 +36,7 @@ DeepSeek Harness is a great reasoning engine — but sometimes the job is better
 |---|---|---|
 | 🧠 Auto-triggered dispatch | Say "have Codex translate this README" — the model matches the skill, runs the dispatch script, and answers from the result | Free (uses the target CLI's quota) |
 | 🔧 `conductor_dispatch` tool (optional bundle) | The same registry as a first-class DSH tool, installed into a profile with one command | Free |
+| 🐟 大肥鱼指挥官 panel (bundle) | Sidebar tab just above 更多: 11 chibi crew cards with live status, elapsed time and output tail, a ship log, per-run detail and a 终止 button, and adjustable history retention | Free |
 | 🩺 `doctor` self-check | `python3 dispatch.py doctor` probes which CLIs are installed (resolves PATH + tries `--version`) before you dispatch | Free |
 | 👀 Dry-run preview | Preview the target, working directory, argv, and shell-equivalent command without starting an external agent | Free |
 | 👥 11 agent CLIs | Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok | Their login quotas |
@@ -167,42 +170,63 @@ python3 skills/conductor/scripts/dispatch.py doctor
 
 > Install packages were verified against the npm registry: Kimi is `@moonshot-ai/kimi-code` (bin `kimi`), Grok is `@xai-official/grok` (bin `grok`), Copilot is `@github/copilot` (bin `copilot`), Codex is `@openai/codex`. The `kimi-cli` npm package is an unrelated placeholder with no binary — do not use it.
 
-## 📦 Optional: bundle install (host-only tool)
+## 🐟 The 大肥鱼指挥官 panel (0.4.0+)
 
-This repo is also a **host-only** dsh bundle (declares `dsh.bundle`, **zero client code** — the Web UI is untouched). One command installs the `conductor_dispatch` tool into a profile:
+The bundle now ships a browser half too: a **指挥官** row in the left sidebar, placed immediately above the built-in **更多** menu — the panel's Chinese display name is **大肥鱼指挥官** (Big Fat Fish Commander). It turns dispatches into a small "deep-sea war room":
+
+- **Fleet** — one chibi card per agent CLI, with live status (出击中 / 凯旋 / 折戟 / 返航 / 失联), the current task, a live timer and the tail of stdout;
+- **Ship log** — the last N runs (default 50, adjustable in the panel header; persisted to `~/.dsh/conductor-crew.json`); click any row for the full detail;
+- **Detail & terminate** — argv, working directory, duration, exit code, stdout/stderr tails and the error for one run, plus a 终止 button that tears down the whole process tree;
+- The page polls the same-origin `/conductor/state` route, and only while it is visible; nothing leaves the machine.
+
+Notes:
+
+- Only dispatches that go through the bundle's `conductor_dispatch` tool appear in the panel. The skill's `dispatch.py` runs as a plain subprocess and registers nothing — by design.
+- The chibis are hand-drawn SVG placeholders; the panel is structured so they can be swapped for generated AI 二次元 portraits later.
+- Headless/CLI profiles without a web server still get the tool: the route is registered lazily and simply never used.
+
+## 📦 Optional: install the bundle (tool + panel)
+
+This repo is also a dsh bundle — a host half (`dsh.bundle`) plus a browser half (`dsh.client.platform = "web"`). One command installs both into a profile:
 
 ```sh
-dsh plugin --profile web add dsh-agent-conductor
+dsh plugin --profile desktop add dsh-agent-conductor
 ```
 
-Or straight from GitHub: `dsh plugin --profile web add github:MJorgin/dsh-agent-conductor`.
+Or straight from GitHub: `dsh plugin --profile desktop add github:MJorgin/dsh-agent-conductor`. Use your own profile name if it isn't `desktop`; restart DSH after installing a new bundle (a replaced package also needs a restart before its new client module is served).
 
-- The tool and the skill share the same CLI registry (`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py` — keep the three in sync when adding CLIs);
-- No client half, so the Web UI is never affected (the early panel-carrying client version was removed — see git log);
+- The tool, the panel and the skill share the same CLI registry (`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py` — keep the three in sync when adding CLIs);
+- The browser half is a hand-written client module (`client.js`): it registers the sidebar row and the `main` page through `ctx.slots`, and talks only to the same-origin `/conductor` route;
 - Hardened host execution: supports dry-run previews, explicitly declares the `subprocess` dependency, enforces a real 10-minute timeout that **terminates the whole process tree** (also on cancel — no orphaned CLIs), and clips over-long output (head + tail, ~20k chars) so a chatty agent can't blow up the context; stderr diagnostics are bounded the same way (head + rolling tail) so the real trailing error survives;
-- Panels / task-board recycling are on the roadmap.
+- The panel page replaces the conversation area while open; switch back to a session from the sidebar. It uses only `--dsw-alias-*` theme tokens, so it follows light/dark automatically;
+- Task-board recycling beyond this panel is still on the roadmap (see below).
 
 ## 📂 Repo layout
 
 ```
-index.js                      # bundle host half: conductor_dispatch tool (host-only)
-cordis.patch.yml              # bundle layer (one row, no client)
+index.js                      # bundle host half: conductor_dispatch tool + /conductor routes
+conductor-store.js            # run registry behind the panel (pure, unit-tested)
+client.js                     # browser half: 指挥官 sidebar row + 大肥鱼指挥官 page
+cordis.patch.yml              # bundle layer (one host row)
 skills/conductor/SKILL.md      # skill definition: trigger description + dispatch rules + privacy
 skills/conductor/scripts/dispatch.py  # dispatch engine (Python stdlib, zero deps)
-conductor-dynamic.js           # alternative: dynamic-plugin edition (cordis_define route)
+conductor-dynamic.js           # alternative: dynamic-plugin edition (tool only — no panel)
+tests/                         # clip, store, route, client-module and CLI-glue tests
 ```
 
 ## 🗺️ Roadmap
 
 - [x] `doctor` health check and dry-run preview
+- [x] 大肥鱼指挥官 panel — live fleet status, ship log, per-run detail + 终止 (0.4.0)
+- [ ] Generated AI 二次元 portraits for the crew (hand-drawn SVG chibis ship as placeholders)
 - [ ] Routing by capability, speed, and cost
-- [ ] Panel UI (optional, dynamic-plugin client half)
 - [ ] Task-board recycling: dispatch results written back to dsh-task-board cards
 - [ ] Squad orchestration: one task fanned out to several agents and merged (Multica squads shape)
 
 ## 🔑 Keys & privacy
 
 - Keys are never stored in this repo. The skill script reads env vars, then `~/.dsh/secrets/media-tools.env` (same convention as dsh-media-skills).
+- The panel is local-only: run history and its settings stay in `~/.dsh/conductor-crew.json`; nothing is uploaded.
 - Task text is sent to the target CLI's provider — never put secrets or internal data into a task.
 - Results belong to the target CLI's terms of service; mark deliverables as "done by <agent name>".
 

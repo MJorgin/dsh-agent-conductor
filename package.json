@@ -1,13 +1,27 @@
 {
   "name": "dsh-agent-conductor",
-  "version": "0.3.2",
-  "description": "In-session cross-agent dispatch for DeepSeek Harness: a zero-dependency skill and a host-only bundle that send self-contained tasks to 11 external agent CLIs (Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok).",
+  "version": "0.4.0",
+  "description": "In-session cross-agent dispatch for DeepSeek Harness: a zero-dependency skill and bundle that send self-contained tasks to 11 external agent CLIs (Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok), plus the 大肥鱼指挥官 (Big Fat Fish Commander) live fleet panel in the sidebar.",
   "type": "module",
   "main": "index.js",
-  "scripts": {
-    "test": "node --test tests/conductor-output.test.mjs"
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js"
   },
-  "files": ["index.js", "conductor-dynamic.js", "cordis.patch.yml", "skills", "README.md", "docs"],
+  "scripts": {
+    "test": "node --test tests/conductor-output.test.mjs tests/conductor-store.test.mjs tests/conductor-route.test.mjs tests/conductor-client.test.mjs"
+  },
+  "files": [
+    "index.js",
+    "conductor-store.js",
+    "conductor-dynamic.js",
+    "client.js",
+    "cordis.patch.yml",
+    "skills",
+    "README.md",
+    "docs",
+    "LICENSE"
+  ],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -24,10 +38,13 @@
     "registry": "https://registry.npmjs.org",
     "access": "public"
   },
-  "keywords": ["deepseek-harness", "dsh", "dsh-plugin", "agent", "codex", "claude-code", "multica", "conductor", "dispatch"],
+  "keywords": ["deepseek-harness", "dsh", "dsh-plugin", "agent", "codex", "claude-code", "multica", "conductor", "dispatch", "panel", "desktop", "commander"],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
     }
   }
 }

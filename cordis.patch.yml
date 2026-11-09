@@ -1,5 +1,7 @@
-# dsh-agent-conductor bundle layer: host-only row. No dsh.client manifest —
-# this bundle ships no browser code and cannot affect the Web UI.
+# dsh-agent-conductor bundle layer: one host row. The host half registers the
+# conductor_dispatch tool and the same-origin /conductor panel route; the
+# browser half (client.js, declared via package.json dsh.client) adds the
+# 大肥鱼指挥官 sidebar row and its main-area page.
 - insert:
     - id: conductor
       name: dsh-agent-conductor

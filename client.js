@@ -1,0 +1,949 @@
+/**
+ * Browser half of dsh-agent-conductor: 大肥鱼指挥官 (Big Fat Fish Commander).
+ *
+ * A full page in the layout's `main` slot plus one navigation row in the
+ * left `sidebar.panellist` — the same pair the shipped Plugins page and
+ * dsh-media-skills use. The page reads the host-side run registry from the
+ * same-origin `/conductor` route; it never talks to child processes directly.
+ *
+ * Registration order is high (1000) so the row sits immediately above the
+ * built-in 更多 menu. Avatars are placeholder chibi art for now; the user plans
+ * to swap in generated AI 二次元 portraits later.
+ */
+window.__ModuleLoader__.load({
+  id: 'dsh-agent-conductor',
+  factory: (require) => {
+    var module = { exports: {} }
+    var exports = module.exports
+    const React = require('react')
+    const h = React.createElement
+
+    const STYLE_ID = 'dsh-agent-conductor-style'
+    const PANEL_ID = 'conductor'
+    const NS = 'conductorCrew'
+    const POLL_MS = 1500
+
+    const STATUS_COLORS = {
+      running: '#39b980',
+      cancelling: '#d9a441',
+      done: '#4c8dff',
+      failed: '#e5534b',
+      cancelled: '#9aa4ad',
+      timeout: '#e0a72e',
+      idle: '#8b949e',
+    }
+
+    function hexToRgba(hex, alpha) {
+      const value = typeof hex === 'string' && /^#[0-9a-f]{6}$/i.test(hex) ? hex.slice(1) : '8b949e'
+      const r = parseInt(value.slice(0, 2), 16)
+      const g = parseInt(value.slice(2, 4), 16)
+      const b = parseInt(value.slice(4, 6), 16)
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`
+    }
+
+    const COPY = {
+      zh: {
+        panel: '指挥官',
+        title: '大肥鱼指挥官',
+        subtitle: '深海作战室 · 鱼群编队实时战报',
+        'chips.active': '出击中 {n}',
+        'chips.done': '凯旋 {n}',
+        'chips.failed': '折戟 {n}',
+        'section.fleet': '鱼群编队',
+        'section.log': '航海日志',
+        'section.log.empty': '海面平静，还没有派活记录。用 conductor_dispatch 派第一件任务吧。',
+        'section.log.hint': '最近 {n} 条战报，点击查看详情',
+        'state.offline': '无法连接宿主：{message}',
+        'state.offline.hint': '检查 Web 服务是否可用后重试。',
+        'btn.refresh': '刷新',
+        'btn.detail': '详情',
+        'btn.cancel': '终止',
+        'btn.cancelling': '返航中…',
+        'btn.close': '关闭',
+        'btn.save': '保存',
+        'btn.saving': '保存中…',
+        'status.running': '出击中',
+        'status.cancelling': '返航中',
+        'status.done': '凯旋',
+        'status.failed': '折戟',
+        'status.cancelled': '返航',
+        'status.timeout': '失联',
+        'status.idle': '待命',
+        'task.idle': '待命中，随时可以出发。',
+        'task.empty': '（无任务描述）',
+        'meta.elapsed': '计时',
+        'meta.output': '输出',
+        'meta.exit': '退出码',
+        'meta.started': '出发',
+        'meta.ended': '收队',
+        'meta.duration': '耗时',
+        'meta.chars': '字',
+        'tail.empty': '（暂无输出）',
+        'hint.dispatch': '等待派活',
+        'hint.idle': '（还没出过海）',
+        'detail.title': '战报详情',
+        'detail.id': '编号',
+        'detail.agent': '船员',
+        'detail.cwd': '工作目录',
+        'detail.argv': '命令',
+        'detail.task': '任务',
+        'detail.stdout': '标准输出（尾部）',
+        'detail.stderr': '标准错误（尾部）',
+        'detail.error': '错误',
+        'detail.none': '（无）',
+        'detail.loading': '正在读取战报…',
+        'detail.missing': '这条战报不存在，可能已被清理。',
+        'detail.running': '任务仍在执行，输出会持续更新。',
+        'settings.label': '航海日志保留',
+        'settings.unit': '条',
+        'settings.hint': '1–200，保存后立即生效',
+        'notice.cancelled': '已请求终止：{name}',
+        'notice.saved': '保留条数已保存为 {n}。',
+        'notice.invalid': '保留条数需为 1–200 的整数。',
+        'notice.error': '操作失败：{message}',
+        'confirm.cancel': '确定要终止「{name}」正在执行的任务吗？这会结束整个进程树。',
+        'avatar.alt': '{name} 的二次元头像',
+        'unit.seconds': '秒',
+        'time.justNow': '刚刚',
+        'time.secondsAgo': '{n} 秒前',
+        'time.minutesAgo': '{n} 分钟前',
+        'time.hoursAgo': '{n} 小时前',
+        'footer.note': '同源只读轮询 · 数据留在本机 · 输出默认保留尾部',
+      },
+      en: {
+        panel: 'Commander',
+        title: 'Big Fat Fish Commander',
+        subtitle: 'Deep-Sea War Room · live fleet dispatches',
+        'chips.active': 'Active {n}',
+        'chips.done': 'Returned {n}',
+        'chips.failed': 'Lost {n}',
+        'section.fleet': 'Fleet',
+        'section.log': 'Ship log',
+        'section.log.empty': 'Calm seas — no dispatches yet. Fire the first task with conductor_dispatch.',
+        'section.log.hint': 'Last {n} dispatches, click for details',
+        'state.offline': 'Cannot reach host: {message}',
+        'state.offline.hint': 'Check that the Web service is running, then retry.',
+        'btn.refresh': 'Refresh',
+        'btn.detail': 'Details',
+        'btn.cancel': 'Terminate',
+        'btn.cancelling': 'Returning…',
+        'btn.close': 'Close',
+        'btn.save': 'Save',
+        'btn.saving': 'Saving…',
+        'status.running': 'Underway',
+        'status.cancelling': 'Returning',
+        'status.done': 'Returned',
+        'status.failed': 'Lost',
+        'status.cancelled': 'Recalled',
+        'status.timeout': 'Overdue',
+        'status.idle': 'Standing by',
+        'task.idle': 'Standing by, ready to sail.',
+        'task.empty': '(no task text)',
+        'meta.elapsed': 'Elapsed',
+        'meta.output': 'Output',
+        'meta.exit': 'Exit',
+        'meta.started': 'Cast off',
+        'meta.ended': 'Docked',
+        'meta.duration': 'Duration',
+        'meta.chars': 'chars',
+        'tail.empty': '(no output yet)',
+        'hint.dispatch': 'Awaiting dispatch',
+        'hint.idle': '(has not sailed yet)',
+        'detail.title': 'Dispatch detail',
+        'detail.id': 'ID',
+        'detail.agent': 'Crew',
+        'detail.cwd': 'Working dir',
+        'detail.argv': 'Command',
+        'detail.task': 'Task',
+        'detail.stdout': 'stdout (tail)',
+        'detail.stderr': 'stderr (tail)',
+        'detail.error': 'Error',
+        'detail.none': '(none)',
+        'detail.loading': 'Reading dispatch…',
+        'detail.missing': 'This dispatch no longer exists.',
+        'detail.running': 'Still running — output updates live.',
+        'settings.label': 'Ship-log retention',
+        'settings.unit': 'runs',
+        'settings.hint': '1–200, applies immediately',
+        'notice.cancelled': 'Termination requested: {name}',
+        'notice.saved': 'Retention saved: {n}.',
+        'notice.invalid': 'Retention must be an integer between 1 and 200.',
+        'notice.error': 'Action failed: {message}',
+        'confirm.cancel': 'Terminate “{name}”? This ends the whole process tree.',
+        'avatar.alt': 'Chibi avatar of {name}',
+        'unit.seconds': 's',
+        'time.justNow': 'just now',
+        'time.secondsAgo': '{n}s ago',
+        'time.minutesAgo': '{n}m ago',
+        'time.hoursAgo': '{n}h ago',
+        'footer.note': 'Same-origin polling · data stays on this machine · tails only',
+      },
+    }
+
+    /** Placeholder chibi crew. `gear` picks the head accessory drawn on the avatar. */
+    const CREW = [
+      { id: 'codex', name: 'Codex', skin: '#ffd9b8', hair: '#2f6f4f', suit: '#0f2a1e', accent: '#9fe3b5', gear: 'goggles' },
+      { id: 'claude-code', name: 'Claude Code', skin: '#ffe0c2', hair: '#c96a3a', suit: '#2b1710', accent: '#ffb27a', gear: 'headset' },
+      { id: 'trae', name: 'TraeCode', skin: '#ffd9b8', hair: '#b23b34', suit: '#2a1212', accent: '#ff8f8a', gear: 'cap' },
+      { id: 'opencode', name: 'OpenCode', skin: '#f2c9a4', hair: '#1f2933', suit: '#0b1220', accent: '#7fb3ff', gear: 'visor' },
+      { id: 'gemini', name: 'Gemini CLI', skin: '#ffe3c8', hair: '#3d6bd8', suit: '#101a3a', accent: '#9fc2ff', gear: 'antenna' },
+      { id: 'cursor', name: 'Cursor CLI', skin: '#f6d2b3', hair: '#5b6472', suit: '#1a1d24', accent: '#c9d3e3', gear: 'star' },
+      { id: 'kimi', name: 'Kimi CLI', skin: '#ffd9c9', hair: '#d65f8f', suit: '#2b1120', accent: '#ffb3d1', gear: 'crown' },
+      { id: 'qwen', name: 'Qwen Code', skin: '#ffdcc0', hair: '#7a4bd0', suit: '#1b1130', accent: '#c9b3ff', gear: 'horns' },
+      { id: 'copilot', name: 'Copilot CLI', skin: '#ffd9b8', hair: '#2f4a7a', suit: '#0d1b33', accent: '#7fd0ff', gear: 'helmet' },
+      { id: 'workbuddy', name: 'WorkBuddy', skin: '#ffe0b0', hair: '#c9971f', suit: '#2b2208', accent: '#ffe08a', gear: 'bolt' },
+      { id: 'grok', name: 'Grok CLI', skin: '#e8c7a6', hair: '#262626', suit: '#0c0c10', accent: '#9aa0a6', gear: 'scarf' },
+    ]
+
+    let localeCtx = null
+    let t = (key, vars) => interpolate(COPY.zh[key] ?? key, vars)
+
+    function interpolate(template, vars) {
+      if (vars === undefined || template === undefined) return template
+      return String(template).replace(/\{(\w+)\}/g, (match, name) => (vars[name] === undefined ? match : String(vars[name])))
+    }
+
+    function ensureStyles() {
+      if (typeof document === 'undefined' || document.getElementById(STYLE_ID) !== null) return
+      const style = document.createElement('style')
+      style.id = STYLE_ID
+      style.textContent = `
+.dshc-page {
+  height: 100%; overflow: auto; box-sizing: border-box;
+  padding: calc(var(--dsh-frame-top-clearance, 48px) + 20px) 40px 40px;
+  color: var(--dsw-alias-label-primary, #0f1115);
+  font-family: var(--dsw-font-family, -apple-system, "PingFang SC", system-ui, sans-serif);
+}
+.dshc-inner { max-width: 1120px; margin: 0 auto; }
+.dshc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.dshc-headline { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.dshc-headtext h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: .01em; }
+.dshc-headtext p { margin: 6px 0 0; font-size: 13px; color: var(--dsw-alias-label-tertiary, #81858c); }
+.dshc-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.dshc-chip {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 12px;
+  color: var(--dsw-alias-label-secondary, #5c6169);
+  background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.035));
+  border: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.06));
+  border-radius: 999px; padding: 3px 10px;
+}
+.dshc-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dshc-status, #8b949e); box-shadow: 0 0 0 2px var(--dshc-status-soft, rgba(139,148,158,.22)); }
+.dshc-header-actions { display: flex; align-items: center; gap: 10px; flex: none; }
+.dshc-settings {
+  display: flex; align-items: center; gap: 8px; font-size: 12px; white-space: nowrap;
+  color: var(--dsw-alias-label-tertiary, #81858c);
+  background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.035));
+  border: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.06));
+  border-radius: 999px; padding: 4px 6px 4px 12px;
+}
+.dshc-settings input {
+  width: 54px; font: inherit; font-size: 12px; text-align: right; box-sizing: border-box;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.12)); border-radius: 7px;
+  background: var(--dsw-alias-bg-base, #fff); color: inherit; padding: 3px 6px; outline: none;
+}
+.dshc-settings input:focus { border-color: var(--dsw-alias-label-secondary, #5c6169); }
+.dshc-btn {
+  font: inherit; font-size: 12.5px; cursor: pointer; border-radius: 8px; padding: 5px 12px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.12));
+  background: var(--dsw-alias-bg-elevated, rgba(0,0,0,.02));
+  color: var(--dsw-alias-label-primary, #0f1115);
+  transition: background .15s ease, border-color .15s ease;
+}
+.dshc-btn:hover:not(:disabled) { background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.05)); }
+.dshc-btn:disabled { opacity: .55; cursor: default; }
+.dshc-btn-primary { background: var(--dsw-alias-button-primary-fill, #0f1115); color: var(--dsw-alias-label-primary-foreground, #fff); border-color: transparent; }
+.dshc-btn-danger { color: #e5534b; border-color: rgba(229,83,75,.35); }
+.dshc-banner {
+  margin-top: 16px; padding: 10px 14px; border-radius: 10px; font-size: 12.5px;
+  color: #b23b34; background: rgba(229,83,75,.08); border: 1px solid rgba(229,83,75,.25);
+}
+.dshc-notice {
+  margin-top: 16px; padding: 8px 14px; border-radius: 10px; font-size: 12.5px;
+  color: var(--dsw-alias-label-secondary, #5c6169);
+  background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.035));
+  border: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.06));
+}
+.dshc-section-title {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  margin: 30px 0 12px;
+}
+.dshc-section-title h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.dshc-section-title span { font-size: 12px; color: var(--dsw-alias-label-tertiary, #81858c); }
+.dshc-fleet { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+.dshc-card {
+  position: relative; display: flex; flex-direction: column; gap: 9px;
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.12));
+  border-radius: 14px; padding: 14px; overflow: hidden;
+  background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.03));
+  transition: border-color .16s ease, box-shadow .16s ease;
+}
+.dshc-card[data-status="running"] {
+  border-color: rgba(57,185,128,.55);
+  box-shadow: inset 0 0 0 1px rgba(57,185,128,.16), 0 0 26px rgba(57,185,128,.08);
+}
+.dshc-card[data-status="failed"] { border-color: rgba(229,83,75,.38); }
+.dshc-cardhead { display: flex; align-items: center; gap: 10px; }
+.dshc-avatar { display: inline-flex; flex: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.18)); }
+.dshc-id { min-width: 0; flex: 1; }
+.dshc-name { font-size: 14px; font-weight: 600; line-height: 1.25; }
+.dshc-callsign { margin-top: 1px; font-size: 11px; color: var(--dsw-alias-label-tertiary, #81858c); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.dshc-pill {
+  flex: none; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11.5px; font-weight: 500; border-radius: 999px; padding: 2px 9px;
+  color: var(--dshc-status, #8b949e);
+  background: var(--dshc-status-soft, rgba(139,148,158,.13));
+  border: 1px solid var(--dshc-status-ring, rgba(139,148,158,.32));
+}
+.dshc-pill .dshc-dot { width: 6px; height: 6px; box-shadow: none; }
+.dshc-task {
+  font-size: 12.5px; line-height: 1.55; color: var(--dsw-alias-label-secondary, #5c6169);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  min-height: 39px;
+}
+.dshc-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11.5px; color: var(--dsw-alias-label-tertiary, #81858c); }
+.dshc-tail {
+  margin: 0; padding: 8px 10px; max-height: 52px; overflow: hidden; white-space: pre-wrap; word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; line-height: 1.5;
+  color: var(--dsw-alias-label-caption, #8b9097);
+  background: var(--dsw-alias-bg-base, rgba(0,0,0,.03));
+  border: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.06)); border-radius: 8px;
+}
+.dshc-tail-empty { color: var(--dsw-alias-label-caption, #a6abb2); font-style: normal; }
+.dshc-actions { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 2px; }
+.dshc-actions-hint { font-size: 11.5px; color: var(--dsw-alias-label-caption, #a6abb2); }
+.dshc-log {
+  border: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.06));
+  border-radius: 14px; overflow: hidden;
+  background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.02));
+}
+.dshc-logrow {
+  display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 14px; border: 0; border-bottom: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.05));
+  background: none; color: inherit; font: inherit; cursor: pointer;
+}
+.dshc-logrow:last-child { border-bottom: 0; }
+.dshc-logrow:hover { background: var(--dsw-alias-bg-base, rgba(0,0,0,.04)); }
+.dshc-logtime {
+  flex: none; width: 68px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px; color: var(--dsw-alias-label-tertiary, #81858c);
+}
+.dshc-logtext { flex: 1; min-width: 0; font-size: 12.5px; }
+.dshc-logtext b { font-weight: 600; }
+.dshc-logtext span { color: var(--dsw-alias-label-tertiary, #81858c); }
+.dshc-logrow .dshc-pill { font-size: 11px; }
+.dshc-empty { padding: 26px 14px; text-align: center; font-size: 13px; color: var(--dsw-alias-label-tertiary, #81858c); }
+.dshc-foot { margin-top: 26px; font-size: 11.5px; color: var(--dsw-alias-label-caption, #a6abb2); text-align: center; }
+.dshc-mask {
+  position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center;
+  background: rgba(8, 14, 20, .42); backdrop-filter: blur(2px); padding: 24px;
+}
+.dshc-drawer {
+  width: min(760px, 94vw); max-height: 86vh; overflow: auto; box-sizing: border-box;
+  background: var(--dsw-alias-bg-elevated, #fff); color: var(--dsw-alias-label-primary, #0f1115);
+  border: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.12)); border-radius: 16px;
+  box-shadow: 0 28px 70px rgba(0,0,0,.32); padding: 20px 22px;
+}
+.dshc-drawer-head { display: flex; align-items: center; gap: 12px; }
+.dshc-drawer-head h3 { margin: 0; font-size: 16px; font-weight: 600; flex: 1; }
+.dshc-drawer-head .dshc-btn { flex: none; }
+.dshc-kv { display: grid; grid-template-columns: 96px 1fr; gap: 6px 12px; margin-top: 16px; font-size: 12.5px; }
+.dshc-kv dt { color: var(--dsw-alias-label-tertiary, #81858c); }
+.dshc-kv dd { margin: 0; word-break: break-all; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; }
+.dshc-block { margin-top: 16px; }
+.dshc-block h4 { margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--dsw-alias-label-secondary, #5c6169); }
+.dshc-block pre {
+  margin: 0; max-height: 220px; overflow: auto; padding: 10px 12px; white-space: pre-wrap; word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11.5px; line-height: 1.55;
+  color: var(--dsw-alias-label-secondary, #5c6169);
+  background: var(--dsw-alias-bg-base, rgba(0,0,0,.03));
+  border: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.07)); border-radius: 9px;
+}
+.dshc-taskquote {
+  margin: 0; padding: 10px 12px; font-size: 12.5px; line-height: 1.65;
+  color: var(--dsw-alias-label-secondary, #5c6169);
+  background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.03));
+  border-left: 3px solid var(--dsw-alias-border-l3, rgba(0,0,0,.18)); border-radius: 0 8px 8px 0;
+  max-height: 160px; overflow: auto;
+}
+@media (max-width: 760px) {
+  .dshc-page { padding: calc(var(--dsh-frame-top-clearance, 48px) + 14px) 18px 30px; }
+  .dshc-head { flex-direction: column; }
+}
+      `
+      document.head.appendChild(style)
+    }
+
+    /* ------------------------------ artwork ------------------------------ */
+
+    function PanelIcon() {
+      return h('svg', {
+        viewBox: '0 0 16 16', width: 16, height: 16, fill: 'none',
+        stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
+        'aria-hidden': 'true',
+      },
+        h('path', { d: 'M2.1 8.5c2.3-3 5.2-4.5 8.5-4.5 2 0 3.9.6 5.4 1.8-1.2 3.4-4.5 5.6-8.3 5.6-2.2 0-4.2-.9-5.6-2.9Z' }),
+        h('path', { d: 'M2.1 8.5 1 6.1l3.2 1.2M2.1 8.5 1.3 11l3.2-1.4' }),
+        h('circle', { cx: 10.4, cy: 7.6, r: 0.75, fill: 'currentColor', stroke: 'none' }))
+    }
+
+    function CommanderMascot({ size = 92 }) {
+      return h('svg', { viewBox: '0 0 96 96', width: size, height: size, 'aria-hidden': 'true', className: 'dshc-mascot' },
+        h('defs', null,
+          h('linearGradient', { id: 'dshc-sea', x1: '0', y1: '0', x2: '0', y2: '1' },
+            h('stop', { offset: '0%', stopColor: '#1d6f8c' }),
+            h('stop', { offset: '100%', stopColor: '#0b3d55' }))),
+        h('circle', { cx: 48, cy: 50, r: 42, fill: 'url(#dshc-sea)', opacity: 0.9 }),
+        h('path', { d: 'M14 68c8-6 16-6 24 0s16 6 24 0 16-6 22-1v10c-6 5-14 5-22 1s-16-6-24 0-16 6-22 0Z', fill: '#7fd0ff', opacity: 0.16 }),
+        h('path', { d: 'M48 26c14 0 25 10 25 24 0 15-11 27-25 27S23 65 23 50c0-14 11-24 25-24Z', fill: '#ffd9a8' }),
+        h('path', { d: 'M28 35c-9-3-15-9-16-17 8 1 14 4 19 9Z', fill: '#ff9f68' }),
+        h('path', { d: 'M68 35c9-3 15-9 16-17-8 1-14 4-19 9Z', fill: '#ff9f68' }),
+        h('path', { d: 'M48 70c-2 8-7 12-14 13 5-5 7-10 7-15Z', fill: '#ff9f68' }),
+        h('path', { d: 'M48 70c2 8 7 12 14 13-5-5-7-10-7-15Z', fill: '#ff9f68' }),
+        h('path', { d: 'M25 38c2-13 12-20 23-20s21 7 23 20c-7-4-15-6-23-6s-16 2-23 6Z', fill: '#12384a' }),
+        h('path', { d: 'M31 24c4-9 12-13 17-13s13 4 17 13c-5-3-11-4-17-4s-12 1-17 4Z', fill: '#1b4f66' }),
+        h('path', { d: 'M25 38c-4-16 5-26 23-26s27 10 23 26l-7-4c1-11-6-16-16-16s-17 5-16 16Z', fill: '#f3f6f9' }),
+        h('path', { d: 'M24 35h48l-3 6H27Z', fill: '#0f2a3a' }),
+        h('circle', { cx: 26, cy: 38, r: 4, fill: '#e8b84b' }),
+        h('path', { d: 'M38 48c1.6 2 4.4 2 6 0M56 48c1.6 2 4.4 2 6 0', fill: 'none', stroke: '#12384a', strokeWidth: 2.6, strokeLinecap: 'round' }),
+        h('circle', { cx: 39, cy: 47, r: 4.4, fill: '#fff' }),
+        h('circle', { cx: 59, cy: 47, r: 4.4, fill: '#fff' }),
+        h('circle', { cx: 40, cy: 47.5, r: 2.7, fill: '#12374a' }),
+        h('circle', { cx: 60, cy: 47.5, r: 2.7, fill: '#12374a' }),
+        h('circle', { cx: 41.2, cy: 46.2, r: 1, fill: '#fff' }),
+        h('circle', { cx: 61.2, cy: 46.2, r: 1, fill: '#fff' }),
+        h('ellipse', { cx: 33, cy: 56, rx: 4, ry: 2.2, fill: '#ff8fa6', opacity: 0.5 }),
+        h('ellipse', { cx: 65, cy: 56, rx: 4, ry: 2.2, fill: '#ff8fa6', opacity: 0.5 }),
+        h('path', { d: 'M44 57c2.6 2.6 6.4 2.6 9 0', fill: 'none', stroke: '#a35c3f', strokeWidth: 2.2, strokeLinecap: 'round' }),
+        h('circle', { cx: 72, cy: 24, r: 3.2, fill: '#d9f0ff', opacity: 0.55 }),
+        h('circle', { cx: 80, cy: 17, r: 2.1, fill: '#d9f0ff', opacity: 0.4 }))
+    }
+
+    function avatarEyes(offsetY, gear) {
+      if (gear === 'visor') {
+        return [
+          h('rect', { x: 22, y: 33, width: 20, height: 9, rx: 4, fill: '#7fd0ff', opacity: 0.55 }),
+          h('rect', { x: 22, y: 33, width: 20, height: 9, rx: 4, fill: 'none', stroke: '#153847', strokeWidth: 1.4 }),
+          h('path', { d: 'M25 37h6', stroke: '#fff', strokeWidth: 1.4, strokeLinecap: 'round', opacity: 0.8 }),
+        ]
+      }
+      const eye = (cx) => [
+        h('ellipse', { cx, cy: 36 + offsetY, rx: 3.6, ry: 4.4, fill: '#fff' }),
+        h('ellipse', { cx: cx + 0.6, cy: 36.3 + offsetY, rx: 2.4, ry: 3.1, fill: '#24313d' }),
+        h('circle', { cx: cx + 1.5, cy: 34.9 + offsetY, r: 0.9, fill: '#fff' }),
+      ]
+      return [...eye(26), ...eye(38)]
+    }
+
+    function avatarGear(gear) {
+      switch (gear) {
+        case 'goggles':
+          return [
+            h('rect', { x: 19.5, y: 31.5, width: 13, height: 9.5, rx: 4, fill: '#2bd4a0', opacity: 0.32 }),
+            h('rect', { x: 31.5, y: 31.5, width: 13, height: 9.5, rx: 4, fill: '#2bd4a0', opacity: 0.32 }),
+            h('rect', { x: 19.5, y: 31.5, width: 13, height: 9.5, rx: 4, fill: 'none', stroke: '#0f2a1e', strokeWidth: 1.6 }),
+            h('rect', { x: 31.5, y: 31.5, width: 13, height: 9.5, rx: 4, fill: 'none', stroke: '#0f2a1e', strokeWidth: 1.6 }),
+            h('path', { d: 'M32.5 36h-1', stroke: '#0f2a1e', strokeWidth: 1.6 }),
+          ]
+        case 'headset':
+          return [
+            h('path', { d: 'M20 34c0-9 5.5-14 12-14s12 5 12 14', fill: 'none', stroke: '#c96a3a', strokeWidth: 2.6, strokeLinecap: 'round' }),
+            h('circle', { cx: 19.5, cy: 38, r: 4, fill: '#c96a3a' }),
+            h('circle', { cx: 44.5, cy: 38, r: 4, fill: '#c96a3a' }),
+            h('path', { d: 'M44 45c3 1 4 3 4 6', fill: 'none', stroke: '#c96a3a', strokeWidth: 2, strokeLinecap: 'round' }),
+          ]
+        case 'cap':
+          return [
+            h('path', { d: 'M22 28c4-9 16-11 21-2 1 2 1 4 1 6H21c0-2 0-3 1-4Z', fill: '#b23b34' }),
+            h('path', { d: 'M20 22h20c2 0 3 2 3 4H19c-1-2 0-4 1-4Z', fill: '#ff8f8a' }),
+          ]
+        case 'visor':
+          return avatarEyes(2, 'visor')
+        case 'antenna':
+          return [
+            h('path', { d: 'M36 16c0-6 3-9 8-9', fill: 'none', stroke: '#3d6bd8', strokeWidth: 2.2, strokeLinecap: 'round' }),
+            h('circle', { cx: 44, cy: 7.5, r: 2.6, fill: '#9fc2ff' }),
+          ]
+        case 'star':
+          return [
+            h('path', { d: 'M47 12l1.8 4 4.2.4-3.2 3 .9 4.2-3.7-2.3-3.7 2.3.9-4.2-3.2-3 4.2-.4Z', fill: '#ffd76a', stroke: '#c9a227', strokeWidth: 0.8 }),
+          ]
+        case 'crown':
+          return [
+            h('path', { d: 'M28 22l3-8 5 5 4-8 4 8 5-5 3 8Z', fill: '#ffd76a', stroke: '#c9a227', strokeWidth: 1.2, strokeLinejoin: 'round' }),
+            h('circle', { cx: 32, cy: 15, r: 1.3, fill: '#fff' }),
+            h('circle', { cx: 40, cy: 12, r: 1.3, fill: '#fff' }),
+            h('circle', { cx: 48, cy: 15, r: 1.3, fill: '#fff' }),
+          ]
+        case 'horns':
+          return [
+            h('path', { d: 'M25 20c-2-6 0-10 2-12 2 3 3 7 3 11Z', fill: '#e7d6ff', stroke: '#7a4bd0', strokeWidth: 1.2 }),
+            h('path', { d: 'M39 20c2-6 0-10-2-12-2 3-3 7-3 11Z', fill: '#e7d6ff', stroke: '#7a4bd0', strokeWidth: 1.2 }),
+          ]
+        case 'helmet':
+          return [
+            h('path', { d: 'M19 36c0-10 6-17 13-17s13 7 13 17', fill: 'none', stroke: '#2f4a7a', strokeWidth: 3, strokeLinecap: 'round' }),
+            h('path', { d: 'M31 19c1 3 3 4 1 7', fill: 'none', stroke: '#7fd0ff', strokeWidth: 1.6, strokeLinecap: 'round' }),
+          ]
+        case 'bolt':
+          return [
+            h('path', { d: 'M42 11l-6 9h4l-2 7 7-9h-4Z', fill: '#ffd76a', stroke: '#c9a227', strokeWidth: 1 }),
+          ]
+        case 'scarf':
+          return [
+            h('path', { d: 'M20 45c6 4 14 4 20 0 1 4-1 7-3 9-5 3-11 3-15 0-2-2-3-5-2-9Z', fill: '#8b949e', opacity: 0.85 }),
+          ]
+        default:
+          return []
+      }
+    }
+
+    function CrewAvatar({ crew, size = 46, status = 'idle' }) {
+      const gear = avatarGear(crew.gear)
+      const showEyes = true
+      return h('span', { className: 'dshc-avatar', style: { width: size, height: size } },
+        h('svg', {
+          viewBox: '0 0 64 64', width: size, height: size, role: 'img',
+          'aria-label': t('avatar.alt', { name: crew.name }),
+        },
+          h('circle', { cx: 32, cy: 34, r: 29, fill: crew.suit }),
+          h('path', { d: 'M6 44c8-4 14-4 22 0s14 4 22 0 8-3 8-3v17H6Z', fill: crew.accent, opacity: 0.14 }),
+          h('path', { d: 'M9 34c-5-6-4-15 2-20 3 5 4 12 3 20Z', fill: crew.hair }),
+          h('path', { d: 'M55 34c5-6 4-15-2-20-3 5-4 12-3 20Z', fill: crew.hair }),
+          h('circle', { cx: 32, cy: 36, r: 17.5, fill: crew.skin }),
+          h('path', { d: 'M17 36c-1-12 7-19 15-19s16 7 15 19c-4-5-9-7-15-7s-11 2-15 7Z', fill: crew.hair }),
+          h('path', { d: 'M18 33c-2-11 6-18 14-18s16 7 14 18l-4-3c1-8-4-11-10-11s-11 3-10 11Z', fill: crew.hair, opacity: 0.75 }),
+          ...gear,
+          showEyes ? [
+            h('ellipse', { cx: 26, cy: 36, rx: 3.6, ry: 4.4, fill: '#fff' }),
+            h('ellipse', { cx: 26.6, cy: 36.3, rx: 2.4, ry: 3.1, fill: '#24313d' }),
+            h('circle', { cx: 27.5, cy: 34.9, r: 0.9, fill: '#fff' }),
+            h('ellipse', { cx: 38, cy: 36, rx: 3.6, ry: 4.4, fill: '#fff' }),
+            h('ellipse', { cx: 38.6, cy: 36.3, rx: 2.4, ry: 3.1, fill: '#24313d' }),
+            h('circle', { cx: 39.5, cy: 34.9, r: 0.9, fill: '#fff' }),
+          ] : null,
+          h('ellipse', { cx: 22.5, cy: 42, rx: 3.2, ry: 1.8, fill: '#ff9eb0', opacity: 0.5 }),
+          h('ellipse', { cx: 41.5, cy: 42, rx: 3.2, ry: 1.8, fill: '#ff9eb0', opacity: 0.5 }),
+          h('path', { d: 'M29.5 45c1.5 1.7 3.5 1.7 5 0', fill: 'none', stroke: '#8c4a3c', strokeWidth: 1.4, strokeLinecap: 'round' }),
+          h('circle', { cx: 52, cy: 52, r: 7.6, fill: '#ffffff' }),
+          h('circle', { cx: 52, cy: 52, r: 5.2, fill: STATUS_COLORS[status] ?? STATUS_COLORS.idle }))
+      )
+    }
+
+    /* ------------------------------ helpers ------------------------------ */
+
+    function statusStyle(status) {
+      const color = STATUS_COLORS[status] ?? STATUS_COLORS.idle
+      return {
+        '--dshc-status': color,
+        '--dshc-status-soft': hexToRgba(color, 0.14),
+        '--dshc-status-ring': hexToRgba(color, 0.33),
+      }
+    }
+
+    function statusKey(run) {
+      if (run === null) return 'idle'
+      if (run.status === 'running' && run.cancelRequested) return 'cancelling'
+      return run.status
+    }
+
+    function statusLabel(run) {
+      return t(`status.${statusKey(run)}`)
+    }
+
+    function formatDuration(ms) {
+      if (typeof ms !== 'number' || !Number.isFinite(ms) || ms < 0) return '—'
+      const total = Math.floor(ms / 1000)
+      const h = Math.floor(total / 3600)
+      const m = Math.floor((total % 3600) / 60)
+      const s = total % 60
+      if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+      return `${m}:${String(s).padStart(2, '0')}`
+    }
+
+    function formatClock(ts) {
+      if (typeof ts !== 'number' || !Number.isFinite(ts)) return '—'
+      const date = new Date(ts)
+      return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:${String(date.getSeconds()).padStart(2, '0')}`
+    }
+
+    function formatAgo(ts, nowMs) {
+      if (typeof ts !== 'number' || !Number.isFinite(ts)) return t('time.justNow')
+      const diff = Math.max(0, nowMs - ts)
+      if (diff < 10_000) return t('time.justNow')
+      if (diff < 60_000) return t('time.secondsAgo', { n: Math.floor(diff / 1000) })
+      if (diff < 3_600_000) return t('time.minutesAgo', { n: Math.floor(diff / 60_000) })
+      return t('time.hoursAgo', { n: Math.floor(diff / 3_600_000) })
+    }
+
+    function elapsedOf(run, nowMs) {
+      if (run === null) return null
+      if (run.endedAt !== null && typeof run.endedAt === 'number') return run.durationMs
+      return Math.max(0, nowMs - run.startedAt)
+    }
+
+    /** Newest run per agent id: live runs win over history. */
+    function crewState(state) {
+      const map = new Map()
+      const history = Array.isArray(state?.history) ? state.history : []
+      for (const run of history) {
+        if (run && typeof run.agentId === 'string' && !map.has(run.agentId)) map.set(run.agentId, run)
+      }
+      const active = Array.isArray(state?.active) ? state.active : []
+      for (const run of active) {
+        if (run && typeof run.agentId === 'string') map.set(run.agentId, run)
+      }
+      return map
+    }
+
+    function readStats(state) {
+      const stats = state?.stats ?? {}
+      return {
+        active: Number(stats.active) || 0,
+        done: Number(stats.done) || 0,
+        failed: Number(stats.failed) || 0,
+        cancelled: Number(stats.cancelled) || 0,
+        timeout: Number(stats.timeout) || 0,
+      }
+    }
+
+    async function api(path, init) {
+      const response = await fetch(`/conductor${path}`, { cache: 'no-store', ...init })
+      const body = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(body.message ?? `HTTP ${response.status}`)
+      return body
+    }
+
+    /* ------------------------------ widgets ------------------------------ */
+
+    function StatusPill({ status, label }) {
+      return h('span', { className: 'dshc-pill', style: statusStyle(status) },
+        h('span', { className: 'dshc-dot' }), label)
+    }
+
+    function FleetCard({ crew, run, nowMs, busyId, onDetail, onCancel }) {
+      const status = statusKey(run)
+      const elapsed = elapsedOf(run, nowMs)
+      return h('div', { className: 'dshc-card', 'data-status': status === 'idle' ? 'idle' : status },
+        h('div', { className: 'dshc-cardhead' },
+          h(CrewAvatar, { crew, size: 46, status: status === 'idle' ? 'idle' : status }),
+          h('div', { className: 'dshc-id' },
+            h('div', { className: 'dshc-name' }, crew.name),
+            h('div', { className: 'dshc-callsign' }, crew.id)),
+          h(StatusPill, { status, label: statusLabel(run) })),
+        h('div', { className: 'dshc-task' }, run === null ? t('task.idle') : (run.taskPreview || t('task.empty'))),
+        run === null
+          ? h('div', { className: 'dshc-meta' }, h('span', null, t('hint.idle')))
+          : h('div', { className: 'dshc-meta' },
+              h('span', null, `${t('meta.elapsed')} ${formatDuration(elapsed)}`),
+              h('span', null, `${t('meta.output')} ${(run.outputChars ?? 0).toLocaleString()} ${t('meta.chars')}`),
+              typeof run.exitCode === 'number' ? h('span', null, `${t('meta.exit')} ${run.exitCode}`) : null,
+              run.status !== 'running' ? h('span', null, formatAgo(run.endedAt, nowMs)) : null),
+        h('pre', { className: run !== null && run.outputTail ? 'dshc-tail' : 'dshc-tail dshc-tail-empty' },
+          run !== null && run.outputTail ? run.outputTail : t('tail.empty')),
+        h('div', { className: 'dshc-actions' },
+          run === null
+            ? h('span', { className: 'dshc-actions-hint' }, t('hint.dispatch'))
+            : h('button', { type: 'button', className: 'dshc-btn', onClick: () => onDetail(run.id) }, t('btn.detail')),
+          status === 'running'
+            ? h('button', {
+                type: 'button',
+                className: 'dshc-btn dshc-btn-danger',
+                disabled: busyId === run.id,
+                onClick: () => onCancel(run),
+              }, busyId === run.id ? t('btn.cancelling') : t('btn.cancel'))
+            : null))
+    }
+
+    function LogRow({ event, nowMs, onDetail }) {
+      const type = event.type === 'start' ? 'running' : event.type
+      const label = type === 'running'
+        ? t('status.running')
+        : (type === 'done' ? t('status.done')
+          : type === 'failed' ? t('status.failed')
+            : type === 'cancelled' ? t('status.cancelled')
+              : type === 'timeout' ? t('status.timeout') : t('status.idle'))
+      return h('button', { type: 'button', className: 'dshc-logrow', onClick: () => onDetail(event.runId) },
+        h('span', { className: 'dshc-logtime' }, formatClock(event.at)),
+        h('span', { className: 'dshc-pill', style: statusStyle(type) }, h('span', { className: 'dshc-dot' }), label),
+        h('span', { className: 'dshc-logtext' },
+          h('b', null, event.agentName || event.agentId || '—'), ' ',
+          h('span', null, event.taskPreview || t('task.empty'))),
+        type !== 'running' && typeof event.durationMs === 'number'
+          ? h('span', { className: 'dshc-logtime' }, formatDuration(event.durationMs))
+          : h('span', { className: 'dshc-logtime' }, formatAgo(event.at, nowMs)))
+    }
+
+    function DetailDrawer({ run, error, busyId, onClose, onCancel }) {
+      if (run === null && error === null) return null
+      const status = run === null ? 'failed' : statusKey(run)
+      return h('div', { className: 'dshc-mask', onClick: onClose },
+        h('div', { className: 'dshc-drawer', onClick: (event) => event.stopPropagation() },
+          h('div', { className: 'dshc-drawer-head' },
+            run === null
+              ? h('h3', null, t('detail.title'))
+              : h(CrewAvatar, { crew: CREW.find((crew) => crew.id === run.agentId) ?? CREW[0], size: 42, status }),
+            run === null ? null : h('h3', null, `${run.agentName || run.agentId} · ${statusLabel(run)}`),
+            h('button', { type: 'button', className: 'dshc-btn', onClick: onClose }, t('btn.close'))),
+          error !== null
+            ? h('div', { className: 'dshc-banner' }, error)
+            : [
+                run.status === 'running' ? h('div', { className: 'dshc-notice', style: { marginTop: '12px' } }, t('detail.running')) : null,
+                h('dl', { className: 'dshc-kv' },
+                  h('dt', null, t('detail.id')), h('dd', null, run.id),
+                  h('dt', null, t('detail.cwd')), h('dd', null, run.cwd || '—'),
+                  h('dt', null, t('meta.started')), h('dd', null, `${formatClock(run.startedAt)} (${formatAgo(run.startedAt, Date.now())})`),
+                  h('dt', null, t('meta.duration')), h('dd', null, run.endedAt !== null ? formatDuration(run.durationMs) : formatDuration(Math.max(0, Date.now() - run.startedAt))),
+                  h('dt', null, t('meta.output')), h('dd', null, `${(run.outputChars ?? 0).toLocaleString()} ${t('meta.chars')}`),
+                  run.exitCode === null ? null : h('dt', null, t('meta.exit')),
+                  run.exitCode === null ? null : h('dd', null, String(run.exitCode))),
+                h('div', { className: 'dshc-block' },
+                  h('h4', null, t('detail.task')),
+                  h('p', { className: 'dshc-taskquote' }, run.taskPreview || t('detail.none'))),
+                h('div', { className: 'dshc-block' },
+                  h('h4', null, t('detail.argv')),
+                  h('pre', null, Array.isArray(run.argv) ? run.argv.join(' ') : '—')),
+                h('div', { className: 'dshc-block' },
+                  h('h4', null, t('detail.stdout')),
+                  h('pre', null, run.outputTail || t('detail.none'))),
+                run.stderrTail
+                  ? h('div', { className: 'dshc-block' },
+                      h('h4', null, t('detail.stderr')),
+                      h('pre', null, run.stderrTail))
+                  : null,
+                run.error
+                  ? h('div', { className: 'dshc-block' },
+                      h('h4', null, t('detail.error')),
+                      h('pre', null, run.error))
+                  : null,
+                run.status === 'running'
+                  ? h('div', { className: 'dshc-actions', style: { marginTop: '18px' } },
+                      h('button', {
+                        type: 'button',
+                        className: 'dshc-btn dshc-btn-danger',
+                        disabled: busyId === run.id,
+                        onClick: () => onCancel(run),
+                      }, busyId === run.id ? t('btn.cancelling') : t('btn.cancel')))
+                  : null,
+              ]))
+    }
+
+    /* ------------------------------ page ------------------------------ */
+
+    function App() {
+      const [state, setState] = React.useState(null)
+      const [loadError, setLoadError] = React.useState(null)
+      const [tick, setTick] = React.useState(0)
+      const [nowMs, setNowMs] = React.useState(Date.now())
+      const [detail, setDetail] = React.useState(null)
+      const [detailError, setDetailError] = React.useState(null)
+      const [busyId, setBusyId] = React.useState(null)
+      const [limitDraft, setLimitDraft] = React.useState('')
+      const [notice, setNotice] = React.useState('')
+
+      React.useEffect(() => {
+        const id = setInterval(() => setNowMs(Date.now()), 1000)
+        return () => clearInterval(id)
+      }, [])
+
+      React.useEffect(() => {
+        let alive = true
+        let timer = null
+        const load = () => {
+          if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+          api('/state')
+            .then((body) => {
+              if (!alive) return
+              setState(body)
+              setLoadError(null)
+              setLimitDraft((previous) => (previous === '' ? String(body?.settings?.historyLimit ?? '') : previous))
+            })
+            .catch((error) => { if (alive) setLoadError(error.message ?? String(error)) })
+        }
+        load()
+        timer = setInterval(load, POLL_MS)
+        const onVisible = () => {
+          if (document.visibilityState === 'visible') load()
+        }
+        document.addEventListener('visibilitychange', onVisible)
+        return () => {
+          alive = false
+          clearInterval(timer)
+          document.removeEventListener('visibilitychange', onVisible)
+        }
+      }, [tick])
+
+      React.useEffect(() => {
+        if (notice === '') return undefined
+        const id = setTimeout(() => setNotice(''), 4200)
+        return () => clearTimeout(id)
+      }, [notice])
+
+      const refresh = () => setTick((value) => value + 1)
+
+      const openDetail = async (id) => {
+        setDetailError(null)
+        try {
+          const body = await api(`/run?id=${encodeURIComponent(id)}`)
+          setDetail(body.run ?? null)
+        } catch (error) {
+          setDetail(null)
+          setDetailError(error.message ?? String(error))
+        }
+      }
+
+      const closeDetail = () => {
+        setDetail(null)
+        setDetailError(null)
+      }
+
+      const cancelRun = async (run) => {
+        const name = run.agentName || run.agentId || '?'
+        if (typeof window !== 'undefined' && typeof window.confirm === 'function' && !window.confirm(t('confirm.cancel', { name }))) return
+        setBusyId(run.id)
+        try {
+          await api('/cancel', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ id: run.id }),
+          })
+          setNotice(t('notice.cancelled', { name }))
+          refresh()
+        } catch (error) {
+          setNotice(t('notice.error', { message: error.message ?? String(error) }))
+        } finally {
+          setBusyId(null)
+        }
+      }
+
+      const saveLimit = async () => {
+        const value = Number(limitDraft)
+        if (!Number.isInteger(value) || value < 1 || value > 200) {
+          setNotice(t('notice.invalid'))
+          return
+        }
+        setBusyId('settings')
+        try {
+          await api('/settings', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ historyLimit: value }),
+          })
+          setNotice(t('notice.saved', { n: value }))
+          refresh()
+        } catch (error) {
+          setNotice(t('notice.error', { message: error.message ?? String(error) }))
+        } finally {
+          setBusyId(null)
+        }
+      }
+
+      const runs = crewState(state)
+      const stats = readStats(state)
+      const historyLimit = Number(state?.settings?.historyLimit) || 50
+      const events = Array.isArray(state?.events) ? state.events.slice(-historyLimit).reverse() : []
+
+      return h('div', { className: 'dshc-page' },
+        h('div', { className: 'dshc-inner' },
+          h('div', { className: 'dshc-head' },
+            h('div', { className: 'dshc-headline' },
+              h(CommanderMascot, { size: 78 }),
+              h('div', { className: 'dshc-headtext' },
+                h('h1', null, t('title')),
+                h('p', null, t('subtitle')),
+                h('div', { className: 'dshc-chips' },
+                  h('span', { className: 'dshc-chip', style: statusStyle('running') }, h('span', { className: 'dshc-dot' }), t('chips.active', { n: stats.active })),
+                  h('span', { className: 'dshc-chip', style: statusStyle('done') }, h('span', { className: 'dshc-dot' }), t('chips.done', { n: stats.done })),
+                  h('span', { className: 'dshc-chip', style: statusStyle('failed') }, h('span', { className: 'dshc-dot' }), t('chips.failed', { n: stats.failed }))))),
+            h('div', { className: 'dshc-header-actions' },
+              h('div', { className: 'dshc-settings' },
+                h('span', null, `${t('settings.label')}`),
+                h('input', {
+                  value: limitDraft,
+                  inputMode: 'numeric',
+                  min: 1,
+                  max: 200,
+                  onChange: (event) => setLimitDraft(event.target.value),
+                  'aria-label': t('settings.label'),
+                }),
+                h('span', null, t('settings.unit')),
+                h('button', {
+                  type: 'button',
+                  className: 'dshc-btn dshc-btn-primary',
+                  disabled: busyId === 'settings',
+                  onClick: saveLimit,
+                }, busyId === 'settings' ? t('btn.saving') : t('btn.save'))),
+              h('button', { type: 'button', className: 'dshc-btn', onClick: refresh }, t('btn.refresh')))),
+          loadError !== null
+            ? h('div', { className: 'dshc-banner' }, `${t('state.offline', { message: loadError })} ${t('state.offline.hint')}`)
+            : null,
+          notice !== ''
+            ? h('div', { className: 'dshc-notice' }, notice)
+            : null,
+          h('div', { className: 'dshc-section-title' },
+            h('h2', null, t('section.fleet')),
+            h('span', null, t('settings.hint'))),
+          h('div', { className: 'dshc-fleet' },
+            CREW.map((crew) => h(FleetCard, {
+              key: crew.id,
+              crew,
+              run: runs.get(crew.id) ?? null,
+              nowMs,
+              busyId,
+              onDetail: openDetail,
+              onCancel: cancelRun,
+            }))),
+          h('div', { className: 'dshc-section-title' },
+            h('h2', null, t('section.log')),
+            h('span', null, events.length === 0 ? '' : t('section.log.hint', { n: historyLimit }))),
+          h('div', { className: 'dshc-log' },
+            events.length === 0
+              ? h('div', { className: 'dshc-empty' }, t('section.log.empty'))
+              : events.map((event, index) => h(LogRow, {
+                  key: `${event.runId}-${event.type}-${index}`,
+                  event,
+                  nowMs,
+                  onDetail: openDetail,
+                }))),
+          h('div', { className: 'dshc-foot' },
+            [t('footer.note'), state?.version ? `v${state.version}` : null].filter(Boolean).join(' · '))),
+        h(DetailDrawer, {
+          run: detail,
+          error: detailError,
+          busyId,
+          onClose: closeDetail,
+          onCancel: (run) => {
+            cancelRun(run)
+            closeDetail()
+          },
+        })
+      )
+    }
+
+    function apply(ctx) {
+      ensureStyles()
+      if (ctx.locale !== undefined) {
+        localeCtx = ctx.locale
+        ctx.effect(() => ctx.locale.register(NS, COPY), 'dsh-agent-conductor: dictionaries')
+        t = ctx.locale.bind(NS)
+      }
+      // One row in the left sidebar, immediately above the built-in 更多 menu.
+      ctx.slots.inject('sidebar.panellist', () => ctx.slots.register({
+        name: 'sidebar.panellist',
+        id: PANEL_ID,
+        order: 1000,
+        label: () => t('panel'),
+        locale: NS,
+      }, PanelIcon))
+      // The matching full page in the main area.
+      ctx.slots.inject('main', () => ctx.slots.register({
+        name: 'main',
+        key: PANEL_ID,
+      }, App))
+    }
+
+    exports.name = 'dsh-agent-conductor'
+    exports.apply = apply
+    exports.inject = ['slots', 'locale']
+    return module.exports
+  },
+})

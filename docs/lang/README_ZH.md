@@ -6,6 +6,8 @@
 
 **让 DeepSeek Harness 的 agent 自动识别派活需求，把任务派给 11 种外部 agent CLI（Codex、Claude Code、TraeCode、OpenCode、Gemini、Cursor、Kimi、Qwen、Copilot、WorkBuddy、Grok）无头执行，结果回传会话。**
 
+**0.4.0 新增：** **大肥鱼指挥官**面板——把每次派活变成侧栏里一支实时待命的 Q 版鱼群编队。
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../../LICENSE)
 
 [**English**](../../README.md) · **简体中文**
@@ -28,6 +30,7 @@
 |---|---|---|
 | 🧠 自动识别、自动派活 | 说一句「让 Codex 把这份 README 翻译一下」——模型匹配到本 skill，执行派发脚本，照着结果回答 | 免费（消耗目标 CLI 自己的额度） |
 | 🔧 `conductor_dispatch` 工具（可选 bundle） | 同一套注册表，以 DSH 一等公民工具的形式提供，一条命令装进 profile | 免费 |
+| 🐟 大肥鱼指挥官面板（bundle） | 侧栏里紧贴「更多」上方的一行：11 张 Q 版船员卡，实时状态、计时与输出尾迹，航海日志，单次详情 + 终止按钮，历史条数可调 | 免费 |
 | 🩺 `doctor` 自检 | `python3 dispatch.py doctor` 先探测你装了哪些 CLI（解析 PATH + 试跑 `--version`），再决定派给谁 | 免费 |
 | 👀 Dry-run 预览 | 不启动外部 Agent，先查看目标、工作目录、argv 和等价 shell 命令 | 免费 |
 | 👥 11 种 agent CLI | Codex、Claude Code、TraeCode、OpenCode、Gemini、Cursor、Kimi、Qwen、Copilot、WorkBuddy、Grok | 各自 CLI 的登录额度 |
@@ -161,40 +164,63 @@ python3 skills/conductor/scripts/dispatch.py doctor
 
 > 安装包已对照 npm registry 核实：Kimi 是 `@moonshot-ai/kimi-code`（bin `kimi`）、Grok 是 `@xai-official/grok`（bin `grok`）、Copilot 是 `@github/copilot`（bin `copilot`）、Codex 是 `@openai/codex`。npm 上的 `kimi-cli` 是个没有二进制的占位包，请勿使用。
 
-## 可选：bundle 安装（host-only）
+## 🐟 大肥鱼指挥官面板（0.4.0+）
 
-仓库同时是一个 **host-only** dsh bundle（声明 `dsh.bundle`、**无任何客户端代码**，不影响 Web UI），一条命令把 `conductor_dispatch` 工具装进 profile：
+bundle 现在也带浏览器半边：左侧栏新增 **指挥官** 一行，紧贴内置的 **更多** 菜单上方——面板中文名是 **大肥鱼指挥官**。它把派活变成一间小小的「深海作战室」：
+
+- **鱼群编队**：11 位 agent CLI 各有一张 Q 版船员卡，实时显示状态（出击中 / 凯旋 / 折戟 / 返航 / 失联）、当前任务、计时器和 stdout 尾迹；
+- **航海日志**：最近 N 条派活记录（默认 50，面板头部可调，持久化在 `~/.dsh/conductor-crew.json`），点任意一行看完整详情；
+- **详情与终止**：单次运行的 argv、工作目录、耗时、退出码、stdout/stderr 尾迹和错误，外加一个**终止**按钮，会终止整个进程树；
+- 页面只在可见时轮询同源 `/conductor/state`，数据不出本机。
+
+说明：
+
+- 只有走 bundle `conductor_dispatch` 工具的派活会出现在面板里；skill 的 `dispatch.py` 是普通子进程，不登记运行记录——这是刻意的。
+- 船员头像是手绘 SVG 占位；面板结构已按「以后替换成 AI 二次元立绘」预留。
+- 没有 web server 的 CLI/headless profile 仍然只有工具：路由按需注册，用不到就不存在。
+
+## 📦 可选：安装 bundle（工具 + 面板）
+
+仓库同时是一个 dsh bundle——宿主半边（`dsh.bundle`）+ 浏览器半边（`dsh.client.platform = "web"`），一条命令装进 profile：
 
 ```sh
-dsh plugin --profile web add dsh-agent-conductor
+dsh plugin --profile desktop add dsh-agent-conductor
 ```
 
-- 工具、动态插件与技能三处共用同一份 CLI 注册表（`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py`，新增 CLI 时保持同步）；
-- 无 client 半边，不影响 Web UI（早期带面板的客户端版本因此移除，见 git log）；
+或直接从 GitHub 装：`dsh plugin --profile desktop add github:MJorgin/dsh-agent-conductor`。profile 不叫 `desktop` 就换成你的名字；安装新 bundle 后重启 DSH（替换已安装包时也要重启才能加载新的 client module）。
+
+- 工具、面板与技能三处共用同一份 CLI 注册表（`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py`，新增 CLI 时保持同步）；
+- 浏览器半边是手写 client module（`client.js`）：通过 `ctx.slots` 注册左侧一行和 `main` 页面，且只访问同源 `/conductor` 路由；
 - 宿主执行更稳：支持 Dry-run 预览；显式声明 `subprocess` 依赖；真正的 10 分钟超时会**终止整个进程树**（取消时同样清理，不留孤儿进程）；超长输出自动截断（保留头+尾，约 2 万字符），避免话痨 agent 撑爆上下文；stderr 同样有界（头+滚动尾），真正的尾部报错不会丢；
-- 面板/任务看板回收等功能走路线图，另行实现。
+- 面板打开时会占用主区（对话区），从左侧栏切回任意会话即可；页面只使用 `--dsw-alias-*` 主题 token，自动跟随明暗；
+- 面板之外的任务看板回收仍在路线图上。
 
 ## 仓库内容
 
 ```
-index.js                      # bundle 宿主半边：conductor_dispatch 工具（host-only）
-cordis.patch.yml              # bundle 层（单行，无客户端）
+index.js                      # bundle 宿主半边：conductor_dispatch 工具 + /conductor 路由
+conductor-store.js            # 面板背后的运行登记表（纯函数，有单测）
+client.js                     # 浏览器半边：指挥官侧栏行 + 大肥鱼指挥官页面
+cordis.patch.yml              # bundle 层（单行宿主注册）
 skills/conductor/SKILL.md      # 技能定义：触发描述 + 派活规则 + 隐私
 skills/conductor/scripts/dispatch.py  # 派活引擎（Python 标准库，零依赖）
-conductor-dynamic.js           # 备选：动态插件版（cordis_define 路线）
+conductor-dynamic.js           # 备选：动态插件版（只有工具，没有面板）
+tests/                         # 截断、登记表、路由、client module 与 CLI 胶水测试
 ```
 
 ## 路线图
 
 - [x] `doctor` 健康检查和 Dry-run 预览
+- [x] 大肥鱼指挥官面板——实时编队状态、航海日志、单次详情 + 终止（0.4.0）
+- [ ] 船员 AI 二次元立绘（当前为手绘 SVG 占位）
 - [ ] 按能力、速度和成本选择 Agent
-- [ ] 面板 UI（可选，动态插件 client 半边）
 - [ ] 任务看板回收：派活结果写入 dsh-task-board 卡片
 - [ ] 小队编排：一个任务分发给多个 agent 汇总（Multica squads 形态）
 
 ## 隐私
 
 - Key 永不写进仓库；脚本读环境变量或 `~/.dsh/secrets/media-tools.env`（与 dsh-media-skills 同一约定）。
+- 面板数据只在本地：运行历史与设置保存在 `~/.dsh/conductor-crew.json`，不会上传。
 - 任务文本会发给对应 CLI 的服务商，敏感信息（密钥、内部数据）不要写进任务。
 - 结果的版权/合规归属对应 CLI 的服务条款，交付时如实标注「由 <agent 名> 完成」。
 

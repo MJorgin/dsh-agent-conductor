@@ -41,6 +41,7 @@ python3 scripts/dispatch.py <agent> "<任务>"
 - **未安装**：先跑 `doctor` 看哪些 CLI 可用；脚本报错也会附安装命令——把安装命令转告用户，征得同意前不要替用户安装 CLI。
 - **Codex 报「不信任目录」**：把 `CONDUCTOR_CWD=/path/to/git/repo` 写进 `~/.dsh/secrets/media-tools.env`（或环境变量），指向受信任的 git 仓库。
 - **失败重试**：先读报错定位原因（未登录 / 未安装 / 网络 / 任务描述不清），修正任务文本后重派一次；同一失败不要连试三次以上。
+- **面板可见性**：本 skill 直接跑 `dispatch.py`，不经过宿主登记表，因此不会出现在桌面版「大肥鱼指挥官」面板；面板只记录通过 bundle 的 `conductor_dispatch` 工具发起的派活。
 - **配额透明**：派活消耗的是对方 CLI 的登录额度（如 Codex 订阅），派之前任务必须明确、值得跑，不派无意义的小事。
 
 ## 隐私

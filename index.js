@@ -1,15 +1,24 @@
 /**
- * dsh-agent-conductor (host half, bundle form): registers the
- * `conductor_dispatch` tool — dispatch a self-contained task to one of 11
- * external agent CLIs and bring the result back into the conversation.
+ * dsh-agent-conductor (host half, bundle form).
  *
- * Host-only by design: this package declares NO dsh.client manifest, so no
- * browser code is shipped and the Web UI cannot be affected. The friendly
- * panel UI lives in the skill/README docs, not in the bundle.
+ * Two surfaces share one package:
+ *   1. the `conductor_dispatch` tool — dispatch a self-contained task to one of
+ *      11 external agent CLIs and bring the result back into the conversation;
+ *   2. the 大肥鱼指挥官 panel (client.js) — a read-only view of live and recent
+ *      dispatches, fed by this half's run registry over the same-origin
+ *      `/conductor` prefix route.
  *
- * The same registry powers skills/conductor/scripts/dispatch.py — keep the
- * two in sync when adding CLIs.
+ * The route is registered lazily through `ctx.inject(['webServer'], ...)` so
+ * headless CLI profiles without a web server still load the tool normally.
+ *
+ * The same agent registry powers skills/conductor/scripts/dispatch.py — keep
+ * the two in sync when adding CLIs.
  */
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { dirname, join } from 'node:path'
+import { createRunStore, normalizeHistoryLimit } from './conductor-store.js'
+
 export const name = 'dsh-agent-conductor'
 export const inject = ['tools', 'subprocess']
 
@@ -40,6 +49,49 @@ const STDERR_HEAD_CHARS = 4_000
 const STDERR_TAIL_CHARS = 2_000
 /** Cap the error snippet embedded in an Error message (first + last part of it). */
 const ERROR_DETAIL_CHARS = 500
+
+const CONDUCTOR_PREFIX = '/conductor'
+const SETTINGS_FILE = 'conductor-crew.json'
+
+function readPackageVersion() {
+  try {
+    const parsed = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
+    return typeof parsed?.version === 'string' && parsed.version !== '' ? parsed.version : '0.4.0'
+  } catch {
+    return '0.4.0'
+  }
+}
+
+const PACKAGE_VERSION = readPackageVersion()
+
+function settingsPath() {
+  const home = typeof process.env.DSH_HOME === 'string' && process.env.DSH_HOME.trim() !== ''
+    ? process.env.DSH_HOME.trim()
+    : join(homedir(), '.dsh')
+  return join(home, SETTINGS_FILE)
+}
+
+function readSettings() {
+  try {
+    const parsed = JSON.parse(readFileSync(settingsPath(), 'utf8'))
+    const historyLimit = normalizeHistoryLimit(parsed?.historyLimit)
+    return historyLimit === null ? {} : { historyLimit }
+  } catch {
+    return {}
+  }
+}
+
+function writeSettings(settings) {
+  try {
+    const file = settingsPath()
+    mkdirSync(dirname(file), { recursive: true })
+    const body = `${JSON.stringify({ historyLimit: settings.historyLimit }, null, 2)}\n`
+    writeFileSync(file, body, { encoding: 'utf8', mode: 0o600 })
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    console.error(`[conductor] crew settings write skipped: ${message}`)
+  }
+}
 
 /**
  * Keep the head and tail of an over-long output with an elision marker in
@@ -145,7 +197,93 @@ function renderPlan({ agent, task, cwd, argv }) {
   ].join('\n')
 }
 
+/* ------------------------------------------------------------------ */
+/* Panel data route (/conductor)                                       */
+/* ------------------------------------------------------------------ */
+
+/** Reject cross-site callers: the panel is same-origin, a web page is not. */
+function originAllowed(req) {
+  const host = req?.headers?.host
+  if (typeof host !== 'string' || host === '') return false
+  const origin = req.headers.origin ?? req.headers.referer
+  if (origin === undefined) return true
+  try {
+    return new URL(origin).host === host
+  } catch {
+    return false
+  }
+}
+
+function sendJson(res, status, payload) {
+  const body = JSON.stringify(payload)
+  res.writeHead(status, {
+    'content-type': 'application/json; charset=utf-8',
+    'cache-control': 'no-store',
+  })
+  res.end(body)
+}
+
+async function readJsonBody(req) {
+  let raw = ''
+  for await (const chunk of req) raw += String(chunk)
+  try {
+    return JSON.parse(raw || '{}')
+  } catch {
+    return {}
+  }
+}
+
+/**
+ * Same-origin JSON API for the panel:
+ *   GET  /conductor/state            -> registry snapshot
+ *   GET  /conductor/run?id=...       -> one run with full tails
+ *   POST /conductor/cancel {id}      -> request process-tree termination
+ *   POST /conductor/settings {historyLimit} -> persist retention
+ */
+export function createConductorHandler({ store, version = PACKAGE_VERSION, agents = [] } = {}) {
+  return async function conductorHandler(req, res) {
+    try {
+      if (!originAllowed(req)) {
+        sendJson(res, 403, { ok: false, message: 'cross-site request refused' })
+        return
+      }
+      const url = new URL(req.url ?? '/', 'http://localhost')
+      const route = url.pathname.slice(CONDUCTOR_PREFIX.length) || '/'
+      if (req.method === 'GET' && route === '/state') {
+        sendJson(res, 200, { ...store.snapshot(), version, agents })
+        return
+      }
+      if (req.method === 'GET' && route === '/run') {
+        const result = store.detail(url.searchParams.get('id') ?? '')
+        sendJson(res, result.ok ? 200 : 404, result)
+        return
+      }
+      if (req.method === 'POST' && route === '/cancel') {
+        const payload = await readJsonBody(req)
+        const result = store.requestCancel(typeof payload.id === 'string' ? payload.id : '')
+        sendJson(res, result.ok ? 200 : 404, result)
+        return
+      }
+      if (req.method === 'POST' && route === '/settings') {
+        const payload = await readJsonBody(req)
+        const historyLimit = store.setHistoryLimit(payload.historyLimit)
+        writeSettings({ historyLimit })
+        sendJson(res, 200, { ok: true, settings: { historyLimit } })
+        return
+      }
+      sendJson(res, 404, { ok: false, message: 'unknown conductor route' })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      try {
+        sendJson(res, 400, { ok: false, message })
+      } catch { /* response already gone */ }
+    }
+  }
+}
+
 export function apply(ctx) {
+  const store = createRunStore({ historyLimit: readSettings().historyLimit })
+
   const tool = {
     name: 'conductor_dispatch',
     description:
@@ -194,11 +332,23 @@ export function apply(ctx) {
         }
         return renderPlan({ agent, task: args.task, cwd, argv: previewArgv })
       }
+
+      // Track every real dispatch for the 大肥鱼指挥官 panel; dry-runs are not runs.
+      const run = store.begin({ agentId: agent.id, agentName: agent.name, task: args.task, cwd, argv })
       const subprocess = ctx.get('subprocess')
       if (!subprocess) {
+        store.finish(run.id, 'failed', { error: '宿主 subprocess 服务不可用' })
         throw new Error('宿主 subprocess 服务不可用')
       }
-      const spawnArgv = await resolveArgv0(subprocess, agent, argv)
+      let spawnArgv
+      try {
+        spawnArgv = await resolveArgv0(subprocess, agent, argv)
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        store.finish(run.id, 'failed', { error: message })
+        throw error
+      }
+      store.setArgv(run.id, spawnArgv)
       let child
       try {
         child = subprocess.spawn({
@@ -209,7 +359,9 @@ export function apply(ctx) {
         })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
-        throw new Error(`${agent.name} 启动失败：${message}。安装：${agent.install}`)
+        const detail = `${agent.name} 启动失败：${message}。安装：${agent.install}`
+        store.finish(run.id, 'failed', { error: detail })
+        throw new Error(detail)
       }
       // Bound in-memory buffering without dropping the end of the stream: keep
       // the first MAX_OUTPUT_CHARS characters plus a rolling window of the last
@@ -231,6 +383,7 @@ export function apply(ctx) {
           out += text.length <= room ? text : text.slice(0, room)
         }
         tail = (tail + text).slice(-OUTPUT_TAIL_CHARS)
+        store.noteOutput(run.id, 'stdout', text)
       })
       child.stderr?.setEncoding?.('utf8')
       child.stderr?.on('data', (chunk) => {
@@ -242,11 +395,13 @@ export function apply(ctx) {
           errHead += text.length <= room ? text : text.slice(0, room)
         }
         errTail = (errTail + text).slice(-STDERR_TAIL_CHARS)
+        store.noteOutput(run.id, 'stderr', text)
       })
       try { child.stdin?.end() } catch { /* 忽略 */ }
       // Tear down the whole process tree on cancel or on the 10-minute budget
       // so a hung agent CLI cannot outlive the tool call.
       const kill = () => { try { child.terminate?.() } catch { /* 忽略 */ } }
+      store.attachCancel(run.id, kill)
       const onAbort = () => kill()
       exec.signal?.addEventListener?.('abort', onAbort, { once: true })
       let timer
@@ -259,20 +414,42 @@ export function apply(ctx) {
       })
       try {
         const outcome = await Promise.race([child.done, aborted, timedOut])
+        // The panel's 终止 button terminates the tree, but that still looks like
+        // a normal exit; prefer the explanation the operator actually requested.
+        if (run.cancelRequested) {
+          store.finish(run.id, 'cancelled')
+          throw new Error('CONDUCTOR_CANCELLED_BY_PANEL')
+        }
         if (outcome && outcome.exitCode !== 0) {
           const stderrText = formatStderr(errHead, errTail, errTotal).trim()
           const detail = stderrText || clipOutput(out, tail, total)
-          throw new Error(`${agent.name} 退出码 ${outcome.exitCode}：${errorDetail(detail)}`)
+          const message = `${agent.name} 退出码 ${outcome.exitCode}：${errorDetail(detail)}`
+          store.finish(run.id, 'failed', { exitCode: outcome.exitCode, error: message })
+          throw new Error(message)
         }
+        store.finish(run.id, 'done', { exitCode: outcome?.exitCode ?? 0 })
       } catch (error) {
         kill()
         const message = error instanceof Error ? error.message : String(error)
-        if (message === '已取消') throw error
-        if (message === 'TIMEOUT') throw new Error(`${agent.name} 超时（10 分钟），进程已终止。`)
+        if (message === 'CONDUCTOR_CANCELLED_BY_PANEL' || run.cancelRequested) {
+          store.finish(run.id, 'cancelled')
+          throw new Error(`${agent.name} 已被指挥官面板终止。`)
+        }
+        if (message === '已取消') {
+          store.finish(run.id, 'cancelled')
+          throw error
+        }
+        if (message === 'TIMEOUT') {
+          store.finish(run.id, 'timeout')
+          throw new Error(`${agent.name} 超时（10 分钟），进程已终止。`)
+        }
         if (/exitCode|退出码/.test(message)) throw error
         if (/ENOENT|not found/i.test(message)) {
-          throw new Error(`${agent.name} 未安装（或不在 PATH）。安装：${agent.install}`)
+          const hint = `${agent.name} 未安装（或不在 PATH）。安装：${agent.install}`
+          store.finish(run.id, 'failed', { error: hint })
+          throw new Error(hint)
         }
+        store.finish(run.id, 'failed', { error: message })
         throw error
       } finally {
         clearTimeout(timer)
@@ -286,5 +463,21 @@ export function apply(ctx) {
     ctx.tools.register(tool)
   } catch (error) {
     console.error(`[conductor] conductor_dispatch registration skipped: ${error}`)
+  }
+
+  // Panel data route is optional: a CLI-only profile has no web server, and the
+  // bundle must still load so conductor_dispatch keeps working there.
+  if (typeof ctx.inject === 'function') {
+    ctx.inject(['webServer'], (webCtx) => {
+      webCtx.effect(() => {
+        const handler = createConductorHandler({
+          store,
+          version: PACKAGE_VERSION,
+          agents: AGENTS.map((agent) => ({ id: agent.id, name: agent.name })),
+        })
+        const unregister = webCtx.webServer.register({ kind: 'prefix', path: CONDUCTOR_PREFIX, handler })
+        return () => unregister()
+      }, 'dsh-agent-conductor: /conductor routes')
+    })
   }
 }

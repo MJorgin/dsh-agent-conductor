@@ -27,10 +27,13 @@ jobs:
         run: python3 -m unittest discover -s tests -v
 
       - name: Node tests
-        run: node --test tests/conductor-output.test.mjs
+        run: node --test tests/conductor-output.test.mjs tests/conductor-store.test.mjs tests/conductor-route.test.mjs tests/conductor-client.test.mjs
 
-      - name: Bundle syntax
-        run: node --check index.js
+      - name: Host + store + client syntax
+        run: |
+          node --check index.js
+          node --check conductor-store.js
+          node --check client.js
 
       - name: Dynamic plugin syntax
         run: |
