@@ -21,10 +21,13 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: "20"
+          node-version: "22"
 
       - name: Python tests
         run: python3 -m unittest discover -s tests -v
+
+      - name: Node tests
+        run: node --test tests/conductor-output.test.mjs
 
       - name: Bundle syntax
         run: node --check index.js

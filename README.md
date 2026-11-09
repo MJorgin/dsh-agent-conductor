@@ -144,6 +144,8 @@ python3 skills/conductor/scripts/dispatch.py doctor
 ```
 
 > **Working directory is auto-detected.** The bundle tool runs each CLI in the current session's workspace (`exec.agent.session.header.cwd`), then `CONDUCTOR_CWD`, then the harness cwd — no hardcoded paths. Codex still requires a *trusted* git repo: point `CONDUCTOR_CWD=/path/to/git/repo` (env or `~/.dsh/secrets/media-tools.env`) at one if the auto-detected folder isn't trusted. The skill script honors `CONDUCTOR_CWD` and falls back to the current directory.
+> **Codex model override.** Codex reads its model from the shared `~/.codex/config.toml`; if that model isn't available to the current account, set `CONDUCTOR_CODEX_MODEL=<model>` (env or `~/.dsh/secrets/media-tools.env`) and the bundle/dynamic tool and the skill script insert `-m <model>` automatically.
+> **Windows.** The skill script resolves npm `.CMD` shims through `PATHEXT` and decodes CLI output as UTF-8 (`errors="replace"`), so dispatch works even on non-UTF-8 ANSI codepages. The bundle tool goes through the host `subprocess` service, which never shell-interprets argv — on Windows it therefore needs native `.exe` entry points; use the skill script for npm-shim-only CLIs.
 > To let the dispatched agent write files: add `sandbox_mode = "workspace-write"` to Codex's `~/.codex/config.toml`.
 > Dispatching consumes the target CLI's login quota.
 
@@ -177,7 +179,7 @@ Or straight from GitHub: `dsh plugin --profile web add github:MJorgin/dsh-agent-
 
 - The tool and the skill share the same CLI registry (`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py` — keep the three in sync when adding CLIs);
 - No client half, so the Web UI is never affected (the early panel-carrying client version was removed — see git log);
-- Hardened host execution: supports dry-run previews, explicitly declares the `subprocess` dependency, enforces a real 10-minute timeout that **terminates the whole process tree** (also on cancel — no orphaned CLIs), and clips over-long output (head + tail, ~20k chars) so a chatty agent can't blow up the context;
+- Hardened host execution: supports dry-run previews, explicitly declares the `subprocess` dependency, enforces a real 10-minute timeout that **terminates the whole process tree** (also on cancel — no orphaned CLIs), and clips over-long output (head + tail, ~20k chars) so a chatty agent can't blow up the context; stderr diagnostics are bounded the same way (head + rolling tail) so the real trailing error survives;
 - Panels / task-board recycling are on the roadmap.
 
 ## 📂 Repo layout

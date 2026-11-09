@@ -30,13 +30,35 @@ const AGENTS = [
 const DISPATCH_TIMEOUT_MS = 10 * 60 * 1000
 /** Cap the result text handed back to the model so a chatty CLI can't blow up the context. */
 const MAX_OUTPUT_CHARS = 20_000
+/** Streaming buffer shape: keep the first MAX chars plus a rolling tail window. */
+const OUTPUT_HEAD_RATIO = 0.7
+const OUTPUT_TAIL_RATIO = 0.25
+const OUTPUT_HEAD_CHARS = Math.floor(MAX_OUTPUT_CHARS * OUTPUT_HEAD_RATIO)
+const OUTPUT_TAIL_CHARS = Math.floor(MAX_OUTPUT_CHARS * OUTPUT_TAIL_RATIO)
+/** stderr is diagnostics only: keep a bounded head + rolling tail (the real error prints last). */
+const STDERR_HEAD_CHARS = 4_000
+const STDERR_TAIL_CHARS = 2_000
+/** Cap the error snippet embedded in an Error message (first + last part of it). */
+const ERROR_DETAIL_CHARS = 500
 
-/** Keep the head and tail of an over-long output with an elision marker in between. */
-function clipOutput(text, max = MAX_OUTPUT_CHARS) {
-  if (text.length <= max) return text
-  const head = text.slice(0, Math.floor(max * 0.7))
-  const tail = text.slice(-Math.floor(max * 0.25))
-  return `${head}\n\n…[输出过长，已省略中间 ${text.length - max} 字符 / output truncated]…\n${tail}`
+/**
+ * Keep the head and tail of an over-long output with an elision marker in
+ * between. Built from the streaming buffers rather than the whole text:
+ * `head` holds the first MAX_OUTPUT_CHARS characters, `tail` the rolling last
+ * OUTPUT_TAIL_CHARS, and `total` the true stdout length. Agent CLIs print their
+ * final answer last, so the tail is exactly what must not be lost.
+ */
+function clipOutput(head, tail, total, max = MAX_OUTPUT_CHARS) {
+  if (total <= max) return head.trim()
+  const headChars = Math.min(head.length, OUTPUT_HEAD_CHARS)
+  const tailChars = Math.min(tail.length, OUTPUT_TAIL_CHARS)
+  let headText = head.slice(0, headChars)
+  // Never hand the model half of a surrogate pair when a cut lands inside an emoji.
+  if (/[\uD800-\uDBFF]$/.test(headText)) headText = headText.slice(0, -1)
+  let tailText = tail.slice(-tailChars)
+  if (/^[\uDC00-\uDFFF]/.test(tailText)) tailText = tailText.slice(1)
+  const omitted = Math.max(0, total - headText.length - tailText.length)
+  return `${headText}\n\n…[输出过长，已省略中间 ${omitted} 字符 / output truncated]…\n${tailText}`.trim()
 }
 
 function shellQuote(part) {
@@ -49,6 +71,64 @@ function resolveCwd(exec) {
   return (typeof sessionCwd === 'string' && sessionCwd.trim())
     || process.env.CONDUCTOR_CWD?.trim()
     || process.cwd()
+}
+
+/**
+ * Template argv for one agent. Codex reads its model from a shared
+ * ~/.codex/config.toml, which may name a model the current account cannot use;
+ * CONDUCTOR_CODEX_MODEL overrides it without touching that file.
+ */
+function buildArgv(agent, task, env = process.env) {
+  const argv = agent.argv.map((a) => a.split('{task}').join(task))
+  if (agent.id === 'codex') {
+    const model = env?.CONDUCTOR_CODEX_MODEL?.trim()
+    if (model) argv.splice(2, 0, '-m', model) // codex exec -m <model> <task>
+  }
+  return argv
+}
+
+/**
+ * Resolve argv[0] through the host subprocess service before spawning. Node's
+ * spawn does not apply Windows PATHEXT, so npm-installed .CMD shims would
+ * otherwise look "not installed" even though they are on PATH. The host
+ * subprocess service never shell-interprets argv, so .CMD/.BAT shims cannot be
+ * launched at all — report that instead of a confusing spawn failure.
+ */
+async function resolveArgv0(subprocess, agent, argv, platform = process.platform) {
+  if (typeof subprocess.resolveExecutable !== 'function') return argv
+  let executable
+  try {
+    executable = await subprocess.resolveExecutable(argv[0])
+  } catch {
+    throw new Error(`${agent.name} 未安装（或不在 PATH）。安装：${agent.install}`)
+  }
+  if (typeof executable !== 'string' || executable === '') return argv
+  if (platform === 'win32' && /\.(cmd|bat)$/i.test(executable)) {
+    throw new Error(`${agent.name} 只提供了 Windows npm shim（${executable}），宿主 subprocess 不能直接启动 .cmd/.bat；请改用 conductor skill 的 dispatch.py（已支持 PATHEXT），或安装该 CLI 的原生可执行版本。`)
+  }
+  return [executable, ...argv.slice(1)]
+}
+
+/** Rebuild a bounded stderr transcript as head + optional elision marker + tail. */
+function formatStderr(head, tail, total) {
+  if (total === 0 || head === '') return ''
+  const tailStart = total - tail.length
+  if (head.length > tailStart) return head + tail.slice(head.length - tailStart)
+  const omitted = Math.max(0, total - head.length - tail.length)
+  return `${head}\n\n…[stderr 已省略 ${omitted} 字符 / stderr truncated]…\n${tail}`
+}
+
+/** Keep the first and last part of a diagnostic so the real (trailing) error survives. */
+function errorDetail(text) {
+  const trimmed = text.trim()
+  if (trimmed === '') return '(无输出)'
+  if (trimmed.length <= ERROR_DETAIL_CHARS) return trimmed
+  const half = Math.floor(ERROR_DETAIL_CHARS / 2)
+  let head = trimmed.slice(0, half).trimEnd()
+  if (/[\uD800-\uDBFF]$/.test(head)) head = head.slice(0, -1)
+  let tail = trimmed.slice(-half).trimStart()
+  if (/^[\uDC00-\uDFFF]/.test(tail)) tail = tail.slice(1)
+  return `${head} … ${tail}`
 }
 
 function renderPlan({ agent, task, cwd, argv }) {
@@ -102,19 +182,27 @@ export function apply(ctx) {
       if (!agent) {
         throw new Error(`未知 agent "${args.agent}"；可用：${AGENTS.map((e) => e.id).join(', ')}`)
       }
-      const argv = agent.argv.map((a) => a.split('{task}').join(args.task))
+      const argv = buildArgv(agent, args.task)
       const cwd = resolveCwd(exec)
       if (args.dryRun === true) {
-        return renderPlan({ agent, task: args.task, cwd, argv })
+        const subprocess = ctx.get('subprocess')
+        let previewArgv = argv
+        if (subprocess && typeof subprocess.resolveExecutable === 'function') {
+          try {
+            previewArgv = await resolveArgv0(subprocess, agent, argv)
+          } catch { /* preview keeps the template argv; real dispatch reports the install hint */ }
+        }
+        return renderPlan({ agent, task: args.task, cwd, argv: previewArgv })
       }
       const subprocess = ctx.get('subprocess')
       if (!subprocess) {
         throw new Error('宿主 subprocess 服务不可用')
       }
+      const spawnArgv = await resolveArgv0(subprocess, agent, argv)
       let child
       try {
         child = subprocess.spawn({
-          argv,
+          argv: spawnArgv,
           cwd,
           stdio: { stdin: 'pipe', stdout: 'pipe', stderr: 'pipe' },
           graceMs: 15000,
@@ -123,11 +211,38 @@ export function apply(ctx) {
         const message = error instanceof Error ? error.message : String(error)
         throw new Error(`${agent.name} 启动失败：${message}。安装：${agent.install}`)
       }
+      // Bound in-memory buffering without dropping the end of the stream: keep
+      // the first MAX_OUTPUT_CHARS characters plus a rolling window of the last
+      // OUTPUT_TAIL_CHARS, and count the true length. Agent CLIs print their
+      // final answer last, so the tail is exactly the part that must survive.
       let out = ''
-      let err = ''
-      // Bound in-memory buffering; the final result is clipped anyway.
-      child.stdout?.on('data', (chunk) => { if (out.length < MAX_OUTPUT_CHARS * 2) out += chunk })
-      child.stderr?.on('data', (chunk) => { if (err.length < 8000) err += chunk })
+      let tail = ''
+      let total = 0
+      let errHead = ''
+      let errTail = ''
+      let errTotal = 0
+      child.stdout?.setEncoding?.('utf8')
+      child.stdout?.on('data', (chunk) => {
+        const text = typeof chunk === 'string' ? chunk : String(chunk)
+        if (text === '') return
+        total += text.length
+        if (out.length < MAX_OUTPUT_CHARS) {
+          const room = MAX_OUTPUT_CHARS - out.length
+          out += text.length <= room ? text : text.slice(0, room)
+        }
+        tail = (tail + text).slice(-OUTPUT_TAIL_CHARS)
+      })
+      child.stderr?.setEncoding?.('utf8')
+      child.stderr?.on('data', (chunk) => {
+        const text = typeof chunk === 'string' ? chunk : String(chunk)
+        if (text === '') return
+        errTotal += text.length
+        if (errHead.length < STDERR_HEAD_CHARS) {
+          const room = STDERR_HEAD_CHARS - errHead.length
+          errHead += text.length <= room ? text : text.slice(0, room)
+        }
+        errTail = (errTail + text).slice(-STDERR_TAIL_CHARS)
+      })
       try { child.stdin?.end() } catch { /* 忽略 */ }
       // Tear down the whole process tree on cancel or on the 10-minute budget
       // so a hung agent CLI cannot outlive the tool call.
@@ -145,7 +260,9 @@ export function apply(ctx) {
       try {
         const outcome = await Promise.race([child.done, aborted, timedOut])
         if (outcome && outcome.exitCode !== 0) {
-          throw new Error(`${agent.name} 退出码 ${outcome.exitCode}：${(err || out).trim().slice(0, 400) || '(无输出)'}`)
+          const stderrText = formatStderr(errHead, errTail, errTotal).trim()
+          const detail = stderrText || clipOutput(out, tail, total)
+          throw new Error(`${agent.name} 退出码 ${outcome.exitCode}：${errorDetail(detail)}`)
         }
       } catch (error) {
         kill()
@@ -161,7 +278,7 @@ export function apply(ctx) {
         clearTimeout(timer)
         exec.signal?.removeEventListener?.('abort', onAbort)
       }
-      return clipOutput(out.trim())
+      return clipOutput(out, tail, total)
     },
   }
 

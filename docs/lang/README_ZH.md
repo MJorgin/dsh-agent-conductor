@@ -138,6 +138,8 @@ python3 skills/conductor/scripts/dispatch.py doctor
 ```
 
 > **工作目录自动识别。** bundle 工具会让 CLI 在当前会话工作区（`exec.agent.session.header.cwd`）里跑，其次读 `CONDUCTOR_CWD`，再次用宿主 cwd——不再写死任何路径。Codex 仍要求**受信任**的 git 仓库：若自动识别到的目录不被信任，就把 `CONDUCTOR_CWD=/path/to/git/repo` 写进 `~/.dsh/secrets/media-tools.env`（或导出环境变量）。Skill 脚本读 `CONDUCTOR_CWD`，缺省用当前目录。
+> **Codex 模型覆盖。** Codex 的模型来自共享的 `~/.codex/config.toml`；若其中的模型当前账号不可用，设置 `CONDUCTOR_CODEX_MODEL=<model>`（环境变量或 `~/.dsh/secrets/media-tools.env`），bundle/动态插件工具与 skill 脚本都会自动插入 `-m <model>`。
+> **Windows。** skill 脚本按 `PATHEXT` 解析 npm 的 `.CMD` shim，并按 UTF-8 解码 CLI 输出（`errors="replace"`），GBK/ANSI 代码页下也不会丢结果。bundle 工具走宿主 `subprocess` 服务，argv 从不经 shell，所以在 Windows 上要求 CLI 有原生 `.exe` 入口；只有 npm shim 的 CLI 请用 skill 脚本派活。
 > 想让派出的 agent 能写文件：Codex 的 `~/.codex/config.toml` 加 `sandbox_mode = "workspace-write"`。
 > 派活消耗对方 CLI 的登录额度。
 
@@ -169,7 +171,7 @@ dsh plugin --profile web add dsh-agent-conductor
 
 - 工具、动态插件与技能三处共用同一份 CLI 注册表（`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py`，新增 CLI 时保持同步）；
 - 无 client 半边，不影响 Web UI（早期带面板的客户端版本因此移除，见 git log）；
-- 宿主执行更稳：支持 Dry-run 预览；显式声明 `subprocess` 依赖；真正的 10 分钟超时会**终止整个进程树**（取消时同样清理，不留孤儿进程）；超长输出自动截断（保留头+尾，约 2 万字符），避免话痨 agent 撑爆上下文；
+- 宿主执行更稳：支持 Dry-run 预览；显式声明 `subprocess` 依赖；真正的 10 分钟超时会**终止整个进程树**（取消时同样清理，不留孤儿进程）；超长输出自动截断（保留头+尾，约 2 万字符），避免话痨 agent 撑爆上下文；stderr 同样有界（头+滚动尾），真正的尾部报错不会丢；
 - 面板/任务看板回收等功能走路线图，另行实现。
 
 ## 仓库内容

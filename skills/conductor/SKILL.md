@@ -36,6 +36,8 @@ python3 scripts/dispatch.py <agent> "<任务>"
 ## 规则
 
 - **沙箱权限**：脚本在 DSH 的 bash 工具沙箱里运行，多数 agent CLI 需要写自己的运行时目录（Codex 尤为明显）。第一次运行若报 `Operation not permitted` 或被沙箱拒绝，**用同一命令带 `sandbox_permissions: danger-full-access` 重试一次**（会弹出授权给用户确认）；不要反复用普通权限重试。
+- **Windows**：脚本按 `PATHEXT` 解析 npm 的 `.CMD` shim 后再启动，输出按 UTF-8 解码（非法字节替换为 �），不会因 GBK/ANSI 代码页丢结果；10 分钟超时会终止整个进程树。
+- **Codex 模型**：Codex 读共享的 `~/.codex/config.toml`；账号不支持其中模型时，用 `CONDUCTOR_CODEX_MODEL=<model>`（环境变量或 `~/.dsh/secrets/media-tools.env`）覆盖，脚本会自动插入 `-m <model>`。
 - **未安装**：先跑 `doctor` 看哪些 CLI 可用；脚本报错也会附安装命令——把安装命令转告用户，征得同意前不要替用户安装 CLI。
 - **Codex 报「不信任目录」**：把 `CONDUCTOR_CWD=/path/to/git/repo` 写进 `~/.dsh/secrets/media-tools.env`（或环境变量），指向受信任的 git 仓库。
 - **失败重试**：先读报错定位原因（未登录 / 未安装 / 网络 / 任务描述不清），修正任务文本后重派一次；同一失败不要连试三次以上。
