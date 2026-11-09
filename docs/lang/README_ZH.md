@@ -1,12 +1,13 @@
 <div align="center">
 
-<img src="../../docs/social-preview.png" alt="dsh-agent-conductor — DSH 指挥家" width="100%">
-
 # ⚡ dsh-agent-conductor · DSH 指挥家
 
-**让 DeepSeek Harness 的 agent 自动识别派活需求，把任务派给 11 种外部 agent CLI（Codex、Claude Code、TraeCode、OpenCode、Gemini、Cursor、Kimi、Qwen、Copilot、WorkBuddy、Grok）无头执行，结果回传会话。**
+**把任务交给合适的 Agent，让你的 AI 舰队一起出发。**
 
-**0.4.0 新增：** **大肥鱼指挥官**面板——把每次派活变成侧栏里一支实时待命的 Q 版鱼群编队。
+在 DeepSeek Harness 中向 11 种外部 Agent CLI 派遣任务，通过「大肥鱼指挥官」查看进度，并将结果带回对话。
+
+**大肥鱼指挥官 · Big Fat Fish Commander**<br>
+一间装着 11 位船员的深海指挥室。
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../../LICENSE)
 
@@ -15,6 +16,20 @@
 </div>
 
 ---
+
+## 🐟 欢迎来到指挥室
+
+![DeepSeek Harness 中的大肥鱼指挥官页面：舰长与 Agent 船员编队](../../docs/images/commander-panel.png)
+
+从 DSH 侧栏进入「**指挥官**」，查看船员和 CLI 检测状态，追踪派遣进度。点击「**连接**」获取安装或登录的对话引导；点击「**派遣**」，从一条可编辑的任务样例开始。打开的草稿不会自动发送。
+
+### 认识船员
+
+<img src="../../assets/crew-atlas.webp" alt="大肥鱼指挥官的船员角色图集" width="100%">
+
+舰长与船员是为本项目生成的 AI 角色演绎，并非 CLI 厂商的官方形象。这里展示角色图集；面板中会将头像分配给对应 Agent。
+
+> **找到 CLI 不等于已登录。** 面板能检测可执行文件，但不会把账号状态或派遣成功当成已确认。
 
 > 灵感来自 [Multica](https://github.com/multica-ai/multica)——把"agent 小队"概念做成一个零安装成本的 DSH 技能。
 

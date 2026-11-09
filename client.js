@@ -640,9 +640,7 @@ window.__ModuleLoader__.load({
     function CrewAvatar({ crew, size = 46, status = 'idle' }) {
       const gear = avatarGear(crew.gear)
       const showEyes = true
-      // The reference portraits for Kimi and Qwen occupy each other's atlas cells.
-      const atlasId = crew.id === 'kimi' ? 'qwen' : crew.id === 'qwen' ? 'kimi' : crew.id
-      const index = Math.max(0, CREW.findIndex((item) => item.id === atlasId))
+      const index = Math.max(0, CREW.findIndex((item) => item.id === crew.id))
       return h('span', { className: 'dshc-avatar', style: { width: size, height: size }, role: 'img', 'aria-label': t('avatar.alt', { name: crew.name }) },
         h('svg', {
           viewBox: '0 0 64 64', width: size, height: size, 'aria-hidden': 'true',

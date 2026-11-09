@@ -1,12 +1,13 @@
 <div align="center">
 
-<img src="docs/social-preview.png" alt="dsh-agent-conductor — in-session cross-agent dispatch for DeepSeek Harness" width="100%">
-
 # ⚡ dsh-agent-conductor
 
-### *Let your DeepSeek Harness agent dispatch tasks to 11 external agent CLIs — Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok — headlessly, and bring results back into the conversation.*
+**Your AI fleet, ready when you are.**
 
-**New in 0.4.0:** the **大肥鱼指挥官 (Big Fat Fish Commander)** panel — a live fleet view of bundle dispatches, right in the DSH sidebar.
+Delegate tasks from DeepSeek Harness to 11 external agent CLIs, follow their progress in the Big Fat Fish Commander, and bring results back to your conversation.
+
+**大肥鱼指挥官 · Big Fat Fish Commander**<br>
+A small fleet for big tasks.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/MJorgin/dsh-agent-conductor/actions/workflows/ci.yml/badge.svg)](https://github.com/MJorgin/dsh-agent-conductor/actions/workflows/ci.yml)
@@ -19,6 +20,20 @@
 </div>
 
 ---
+
+## 🐟 Meet your command room
+
+![Big Fat Fish Commander panel showing the captain and agent fleet in DeepSeek Harness](docs/images/commander-panel.png)
+
+From the **指挥官** entry in the DSH sidebar, see your crew, check whether each CLI is available, and follow dispatches as they happen. Select **Connect** for an installation or sign-in guidance draft, or **Dispatch** to start with an editable task example. The draft is never sent automatically.
+
+### Meet the crew
+
+<img src="assets/crew-atlas.webp" alt="Illustrated character portraits for the Commander fleet" width="100%">
+
+The captain and crew are AI-generated interpretations made for this project; they are not official characters of the CLI vendors. Artwork is shown here as a visual collection; the panel assigns each portrait to its agent.
+
+> **Availability is not authentication.** Finding a CLI executable does not confirm that it is signed in or ready to run. The panel labels sign-in as unverified.
 
 DeepSeek Harness is a great reasoning engine — but sometimes the job is better done by *another* coding agent: a Codex translation, a Claude Code investigation, a Cursor refactor. This plugin lets your DSH agent **recognize when to delegate** (by skill-description matching), **dispatch a self-contained task** to one of 11 external agent CLIs in headless mode, and **bring the stdout result back as the answer** — while the **大肥鱼指挥官** panel shows the fleet's live status.
 
@@ -221,7 +236,7 @@ tests/                         # clip, store, route, client-module and CLI-glue 
 
 - [x] `doctor` health check and dry-run preview
 - [x] 大肥鱼指挥官 panel — live fleet status, ship log, per-run detail + 终止 (0.4.0)
-- [x] Original AI-generated naval crew portraits and whale captain, with SVG fallbacks
+- [x] AI-generated crew portraits and whale captain, with SVG fallbacks
 - [ ] Routing by capability, speed, and cost
 - [ ] Task-board recycling: dispatch results written back to dsh-task-board cards
 - [ ] Squad orchestration: one task fanned out to several agents and merged (Multica squads shape)
