@@ -6,7 +6,7 @@
 
 ### *Let your DeepSeek Harness agent dispatch tasks to 11 external agent CLIs — Codex, Claude Code, TraeCode, OpenCode, Gemini, Cursor, Kimi, Qwen, Copilot, WorkBuddy, Grok — headlessly, and bring results back into the conversation.*
 
-**New in 0.4.0:** the **大肥鱼指挥官 (Big Fat Fish Commander)** panel — a live, chibi-crewed fleet view of every dispatch, right in the DSH sidebar.
+**New in 0.4.0:** the **大肥鱼指挥官 (Big Fat Fish Commander)** panel — a live fleet view of bundle dispatches, right in the DSH sidebar.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![CI](https://github.com/MJorgin/dsh-agent-conductor/actions/workflows/ci.yml/badge.svg)](https://github.com/MJorgin/dsh-agent-conductor/actions/workflows/ci.yml)
@@ -174,15 +174,16 @@ python3 skills/conductor/scripts/dispatch.py doctor
 
 The bundle now ships a browser half too: a **指挥官** row in the left sidebar, placed immediately above the built-in **更多** menu — the panel's Chinese display name is **大肥鱼指挥官** (Big Fat Fish Commander). It turns dispatches into a small "deep-sea war room":
 
-- **Fleet** — one chibi card per agent CLI, with live status (出击中 / 凯旋 / 折戟 / 返航 / 失联), the current task, a live timer and the tail of stdout;
-- **Ship log** — the last N runs (default 50, adjustable in the panel header; persisted to `~/.dsh/conductor-crew.json`); click any row for the full detail;
-- **Detail & terminate** — argv, working directory, duration, exit code, stdout/stderr tails and the error for one run, plus a 终止 button that tears down the whole process tree;
+- **Fleet** — 11 original AI-generated naval crew portraits, a blue-haired whale captain, and a compact card per CLI. Active cards animate subtly and show the task, timer and stdout tail; reduced-motion preferences are respected;
+- **Ship log** — the last N runs (default 50, adjustable in the header). Completed-run summaries and the retention setting are saved locally in `~/.dsh/conductor-crew.json` and restored after a restart; click a row for details;
+- **Detail & terminate** — while the host is running, inspect argv, working directory, duration, exit code, stdout/stderr tails and errors; the 终止 button stops a running process tree. An open report refreshes automatically;
 - The page polls the same-origin `/conductor/state` route, and only while it is visible; nothing leaves the machine.
 
 Notes:
 
 - Only dispatches that go through the bundle's `conductor_dispatch` tool appear in the panel. The skill's `dispatch.py` runs as a plain subprocess and registers nothing — by design.
-- The chibis are hand-drawn SVG placeholders; the panel is structured so they can be swapped for generated AI 二次元 portraits later.
+- The portraits are original AI-generated interpretations, not official vendor characters. They are bundled locally; the earlier SVG avatars remain as fallbacks. The character direction was inspired by [dsh-pet](https://github.com/PC2005-cloud/dsh-pet); no artwork from that project is bundled.
+- For privacy and bounded storage, restored history contains summaries only: command arguments and output tails are kept in memory and do not survive a restart. Task previews, working directories and error summaries **are** written locally and may contain sensitive text.
 - Headless/CLI profiles without a web server still get the tool: the route is registered lazily and simply never used.
 
 ## 📦 Optional: install the bundle (tool + panel)
@@ -218,7 +219,7 @@ tests/                         # clip, store, route, client-module and CLI-glue 
 
 - [x] `doctor` health check and dry-run preview
 - [x] 大肥鱼指挥官 panel — live fleet status, ship log, per-run detail + 终止 (0.4.0)
-- [ ] Generated AI 二次元 portraits for the crew (hand-drawn SVG chibis ship as placeholders)
+- [x] Original AI-generated naval crew portraits and whale captain, with SVG fallbacks
 - [ ] Routing by capability, speed, and cost
 - [ ] Task-board recycling: dispatch results written back to dsh-task-board cards
 - [ ] Squad orchestration: one task fanned out to several agents and merged (Multica squads shape)
@@ -226,7 +227,7 @@ tests/                         # clip, store, route, client-module and CLI-glue 
 ## 🔑 Keys & privacy
 
 - Keys are never stored in this repo. The skill script reads env vars, then `~/.dsh/secrets/media-tools.env` (same convention as dsh-media-skills).
-- The panel is local-only: run history and its settings stay in `~/.dsh/conductor-crew.json`; nothing is uploaded.
+- The panel is local-only: completed-run summaries and retention settings are saved in `~/.dsh/conductor-crew.json`; command arguments and output tails remain in memory. Nothing is uploaded.
 - Task text is sent to the target CLI's provider — never put secrets or internal data into a task.
 - Results belong to the target CLI's terms of service; mark deliverables as "done by <agent name>".
 

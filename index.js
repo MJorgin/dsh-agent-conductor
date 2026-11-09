@@ -14,7 +14,8 @@
  * The same agent registry powers skills/conductor/scripts/dispatch.py — keep
  * the two in sync when adding CLIs.
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
+import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { createRunStore, normalizeHistoryLimit } from './conductor-store.js'
@@ -52,6 +53,10 @@ const ERROR_DETAIL_CHARS = 500
 
 const CONDUCTOR_PREFIX = '/conductor'
 const SETTINGS_FILE = 'conductor-crew.json'
+const ASSETS = Object.freeze({
+  '/assets/crew-atlas.webp': 'crew-atlas.webp',
+  '/assets/captain.webp': 'captain.webp',
+})
 
 function readPackageVersion() {
   try {
@@ -73,21 +78,30 @@ function settingsPath() {
 
 function readSettings() {
   try {
-    const parsed = JSON.parse(readFileSync(settingsPath(), 'utf8'))
+    const file = settingsPath()
+    if (statSync(file).size > 2_000_000) return {}
+    const parsed = JSON.parse(readFileSync(file, 'utf8'))
     const historyLimit = normalizeHistoryLimit(parsed?.historyLimit)
-    return historyLimit === null ? {} : { historyLimit }
+    return {
+      ...(historyLimit === null ? {} : { historyLimit }),
+      ...(Array.isArray(parsed?.history) ? { history: parsed.history } : {}),
+    }
   } catch {
     return {}
   }
 }
 
 function writeSettings(settings) {
+  let temporary
   try {
     const file = settingsPath()
     mkdirSync(dirname(file), { recursive: true })
-    const body = `${JSON.stringify({ historyLimit: settings.historyLimit }, null, 2)}\n`
-    writeFileSync(file, body, { encoding: 'utf8', mode: 0o600 })
+    const body = `${JSON.stringify({ historyLimit: settings.historyLimit, history: settings.history ?? [] }, null, 2)}\n`
+    temporary = `${file}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`
+    writeFileSync(temporary, body, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
+    renameSync(temporary, file)
   } catch (error) {
+    if (temporary) { try { unlinkSync(temporary) } catch { /* no temporary file */ } }
     const message = error instanceof Error ? error.message : String(error)
     console.error(`[conductor] crew settings write skipped: ${message}`)
   }
@@ -240,7 +254,7 @@ async function readJsonBody(req) {
  *   POST /conductor/cancel {id}      -> request process-tree termination
  *   POST /conductor/settings {historyLimit} -> persist retention
  */
-export function createConductorHandler({ store, version = PACKAGE_VERSION, agents = [] } = {}) {
+export function createConductorHandler({ store, version = PACKAGE_VERSION, agents = [], assetDirectory = new URL('./assets/', import.meta.url), persistSettings = writeSettings } = {}) {
   return async function conductorHandler(req, res) {
     try {
       if (!originAllowed(req)) {
@@ -249,6 +263,24 @@ export function createConductorHandler({ store, version = PACKAGE_VERSION, agent
       }
       const url = new URL(req.url ?? '/', 'http://localhost')
       const route = url.pathname.slice(CONDUCTOR_PREFIX.length) || '/'
+      // Fixed names only: never resolve a path supplied by the request.
+      if (req.method === 'GET' && Object.hasOwn(ASSETS, route)) {
+        let body
+        try {
+          body = await readFile(new URL(ASSETS[route], assetDirectory))
+        } catch {
+          sendJson(res, 404, { ok: false, message: 'conductor asset not found' })
+          return
+        }
+        res.writeHead(200, {
+          'content-type': 'image/webp',
+          'content-length': body.length,
+          'x-content-type-options': 'nosniff',
+          'cache-control': 'no-cache',
+        })
+        res.end(body)
+        return
+      }
       if (req.method === 'GET' && route === '/state') {
         sendJson(res, 200, { ...store.snapshot(), version, agents })
         return
@@ -267,7 +299,9 @@ export function createConductorHandler({ store, version = PACKAGE_VERSION, agent
       if (req.method === 'POST' && route === '/settings') {
         const payload = await readJsonBody(req)
         const historyLimit = store.setHistoryLimit(payload.historyLimit)
-        writeSettings({ historyLimit })
+        // The production store persists on every change, including this one.
+        // Standalone handlers can provide their own settings persistence.
+        persistSettings?.({ historyLimit, history: store.exportHistory() })
         sendJson(res, 200, { ok: true, settings: { historyLimit } })
         return
       }
@@ -282,7 +316,12 @@ export function createConductorHandler({ store, version = PACKAGE_VERSION, agent
 }
 
 export function apply(ctx) {
-  const store = createRunStore({ historyLimit: readSettings().historyLimit })
+  const saved = readSettings()
+  const store = createRunStore({
+    historyLimit: saved.historyLimit,
+    history: saved.history,
+    onHistoryChange: (history, historyLimit) => writeSettings({ historyLimit, history }),
+  })
 
   const tool = {
     name: 'conductor_dispatch',
@@ -342,11 +381,21 @@ export function apply(ctx) {
       }
       let spawnArgv
       try {
+        if (exec.signal?.aborted) throw new Error('已取消')
         spawnArgv = await resolveArgv0(subprocess, agent, argv)
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
+        if (exec.signal?.aborted || run.cancelRequested) {
+          store.finish(run.id, 'cancelled')
+          throw new Error(run.cancelRequested ? `${agent.name} 已被指挥官面板终止。` : '已取消')
+        }
         store.finish(run.id, 'failed', { error: message })
         throw error
+      }
+      // Resolution can be asynchronous; do not start a CLI after cancellation.
+      if (exec.signal?.aborted || run.cancelRequested) {
+        store.finish(run.id, 'cancelled')
+        throw new Error(run.cancelRequested ? `${agent.name} 已被指挥官面板终止。` : '已取消')
       }
       store.setArgv(run.id, spawnArgv)
       let child
@@ -402,15 +451,16 @@ export function apply(ctx) {
       // so a hung agent CLI cannot outlive the tool call.
       const kill = () => { try { child.terminate?.() } catch { /* 忽略 */ } }
       store.attachCancel(run.id, kill)
-      const onAbort = () => kill()
-      exec.signal?.addEventListener?.('abort', onAbort, { once: true })
       let timer
       const timedOut = new Promise((_, reject) => {
         timer = setTimeout(() => { kill(); reject(new Error('TIMEOUT')) }, DISPATCH_TIMEOUT_MS)
       })
+      let onAbort
       const aborted = new Promise((_, reject) => {
         if (!exec.signal) return
-        exec.signal.addEventListener('abort', () => reject(new Error('已取消')), { once: true })
+        onAbort = () => { kill(); reject(new Error('已取消')) }
+        exec.signal.addEventListener('abort', onAbort, { once: true })
+        if (exec.signal.aborted) onAbort()
       })
       try {
         const outcome = await Promise.race([child.done, aborted, timedOut])
@@ -443,7 +493,13 @@ export function apply(ctx) {
           store.finish(run.id, 'timeout')
           throw new Error(`${agent.name} 超时（10 分钟），进程已终止。`)
         }
-        if (/exitCode|退出码/.test(message)) throw error
+        if (/exitCode|退出码/.test(message)) {
+          // `child.done` itself may reject with an exit-code diagnostic. The
+          // explicit non-zero path has already settled, so finish is a no-op
+          // there; otherwise ensure the panel does not retain a phantom run.
+          store.finish(run.id, 'failed', { error: message })
+          throw error
+        }
         if (/ENOENT|not found/i.test(message)) {
           const hint = `${agent.name} 未安装（或不在 PATH）。安装：${agent.install}`
           store.finish(run.id, 'failed', { error: hint })
@@ -453,7 +509,7 @@ export function apply(ctx) {
         throw error
       } finally {
         clearTimeout(timer)
-        exec.signal?.removeEventListener?.('abort', onAbort)
+        if (onAbort) exec.signal?.removeEventListener?.('abort', onAbort)
       }
       return clipOutput(out, tail, total)
     },
@@ -474,6 +530,7 @@ export function apply(ctx) {
           store,
           version: PACKAGE_VERSION,
           agents: AGENTS.map((agent) => ({ id: agent.id, name: agent.name })),
+          persistSettings: null,
         })
         const unregister = webCtx.webServer.register({ kind: 'prefix', path: CONDUCTOR_PREFIX, handler })
         return () => unregister()

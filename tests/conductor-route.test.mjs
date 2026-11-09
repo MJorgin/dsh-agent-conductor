@@ -1,14 +1,17 @@
 // Tests for the same-origin /conductor JSON route that feeds the panel.
 
 import assert from 'node:assert/strict'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { test } from 'node:test'
+import { after, test } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
-const { createConductorHandler } = await import(pathToFileURL(join(ROOT, 'index.js')).href)
+const testHome = mkdtempSync(join(tmpdir(), 'conductor-route-'))
+process.env.DSH_HOME = testHome
+after(() => rmSync(testHome, { recursive: true, force: true }))
+const { apply, createConductorHandler } = await import(pathToFileURL(join(ROOT, 'index.js')).href)
 const { createRunStore } = await import(pathToFileURL(join(ROOT, 'conductor-store.js')).href)
 
 const HOST = '127.0.0.1:56109'
@@ -74,6 +77,35 @@ test('GET /conductor/state returns the registry snapshot', async () => {
   assert.equal(json.active.length, 1)
   assert.equal(json.active[0].id, run.id)
   store.finish(run.id, 'done')
+})
+
+test('only the two fixed image assets are served, with a safe image MIME type', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'conductor-assets-'))
+  try {
+    const atlas = Buffer.from('atlas fixture')
+    const captain = Buffer.from('captain fixture')
+    writeFileSync(join(dir, 'crew-atlas.webp'), atlas)
+    writeFileSync(join(dir, 'captain.webp'), captain)
+    writeFileSync(join(dir, 'private.txt'), 'private')
+    const handler = createConductorHandler({ store: createRunStore(), assetDirectory: pathToFileURL(`${dir}/`) })
+    for (const [name, expected] of [['crew-atlas.webp', atlas], ['captain.webp', captain]]) {
+      const res = makeRes()
+      await handler(makeReq({ url: `/conductor/assets/${name}`, headers: { host: HOST } }), res)
+      assert.equal(res.statusCode, 200)
+      assert.equal(res.headers['content-type'], 'image/webp')
+      assert.equal(res.headers['x-content-type-options'], 'nosniff')
+      assert.equal(res.headers['content-length'], expected.length)
+      assert.deepEqual(res.body, expected)
+    }
+    for (const url of ['/conductor/assets/private.txt', '/conductor/assets/../private.txt', '/conductor/assets/%2e%2e/private.txt']) {
+      const res = await hit(handler, { url, headers: { host: HOST } })
+      assert.equal(res.status, 404)
+    }
+    const crossSite = await hit(handler, { url: '/conductor/assets/captain.webp', headers: { host: HOST, origin: 'https://evil.example' } })
+    assert.equal(crossSite.status, 403)
+  } finally {
+    rmSync(dir, { recursive: true, force: true })
+  }
 })
 
 test('the route refuses cross-site callers and bad origins', async () => {
@@ -156,6 +188,111 @@ test('POST /conductor/cancel reaches the run kill switch', async () => {
   })
   assert.equal(unknown.status, 404)
   store.finish(run.id, 'cancelled')
+})
+
+test('panel cancellation during executable resolution never starts a child', async () => {
+  let tool, handler, resolveExecutable
+  let spawned = false
+  const subprocess = {
+    resolveExecutable: () => new Promise((resolve) => { resolveExecutable = resolve }),
+    spawn() { spawned = true },
+  }
+  apply({
+    tools: { register(value) { tool = value } },
+    get: () => subprocess,
+    inject(_deps, callback) {
+      callback({
+        effect(effect) { effect() },
+        webServer: { register(route) { handler = route.handler; return () => {} } },
+      })
+    },
+  })
+  const dispatch = tool.execute({ agent: 'codex', task: 'inspect' }, {})
+  const state = await hit(handler, { url: '/conductor/state', headers: { host: HOST } })
+  const runId = state.json.active[0].id
+  const cancelled = await hit(handler, {
+    method: 'POST', url: '/conductor/cancel', headers: { host: HOST },
+    body: JSON.stringify({ id: runId }),
+  })
+  assert.equal(cancelled.status, 200)
+  resolveExecutable('/bin/codex')
+  await assert.rejects(dispatch, /已被指挥官面板终止/)
+  assert.equal(spawned, false)
+  const after = await hit(handler, { url: '/conductor/state', headers: { host: HOST } })
+  assert.equal(after.json.active.length, 0)
+  assert.equal(after.json.history[0].status, 'cancelled')
+})
+
+test('a subprocess rejection mentioning exitCode settles the panel record', async () => {
+  let tool, handler
+  apply({
+    tools: { register(value) { tool = value } },
+    get: () => ({ spawn: () => ({ done: Promise.reject(new Error('exitCode unavailable')) }) }),
+    inject(_deps, callback) {
+      callback({
+        effect(effect) { effect() },
+        webServer: { register(route) { handler = route.handler; return () => {} } },
+      })
+    },
+  })
+  await assert.rejects(tool.execute({ agent: 'codex', task: 'inspect' }, {}), /exitCode unavailable/)
+  const after = await hit(handler, { url: '/conductor/state', headers: { host: HOST } })
+  assert.equal(after.json.active.length, 0)
+  assert.equal(after.json.history[0].status, 'failed')
+})
+
+test('legacy settings migrate and completed history survives a restart with a bounded summary', async () => {
+  const previous = process.env.DSH_HOME
+  const home = mkdtempSync(join(tmpdir(), 'conductor-restart-'))
+  process.env.DSH_HOME = home
+  try {
+    writeFileSync(join(home, 'conductor-crew.json'), JSON.stringify({ historyLimit: 2 }))
+    function start() {
+      let tool, handler
+      apply({
+        tools: { register(value) { tool = value } },
+        get: () => ({ spawn: () => ({ done: Promise.resolve({ exitCode: 0 }) }) }),
+        inject(_deps, callback) {
+          callback({ effect(effect) { effect() }, webServer: { register(route) { handler = route.handler; return () => {} } } })
+        },
+      })
+      return { tool, handler }
+    }
+    const first = start()
+    for (const task of ['first', 'second', 'third']) {
+      await first.tool.execute({ agent: 'codex', task }, {})
+    }
+    const saved = JSON.parse(readFileSync(join(home, 'conductor-crew.json'), 'utf8'))
+    assert.equal(saved.historyLimit, 2)
+    assert.deepEqual(saved.history.map((run) => run.taskPreview), ['third', 'second'])
+    assert.equal(saved.history[0].argv, undefined)
+    assert.equal(saved.history[0].stdout, undefined)
+    const restarted = start()
+    let snapshot = await hit(restarted.handler, { url: '/conductor/state', headers: { host: HOST } })
+    assert.deepEqual(snapshot.json.history.map((run) => run.taskPreview), ['third', 'second'])
+    assert.equal(snapshot.json.active.length, 0)
+    assert.deepEqual(snapshot.json.events.map((event) => [event.runId, event.taskPreview, event.type]), [
+      ['crew-002', 'second', 'done'], ['crew-003', 'third', 'done'],
+    ])
+    await restarted.tool.execute({ agent: 'codex', task: 'after restart' }, {})
+    snapshot = await hit(restarted.handler, { url: '/conductor/state', headers: { host: HOST } })
+    assert.deepEqual(snapshot.json.history.map((run) => run.id), ['crew-004', 'crew-003'])
+  } finally {
+    process.env.DSH_HOME = previous
+    rmSync(home, { recursive: true, force: true })
+  }
+})
+
+test('settings change is persisted once when the store owns persistence', async () => {
+  let writes = 0
+  const store = createRunStore({ onHistoryChange: () => { writes += 1 } })
+  const handler = createConductorHandler({ store, persistSettings: null })
+  const response = await hit(handler, {
+    method: 'POST', url: '/conductor/settings', headers: { host: HOST },
+    body: JSON.stringify({ historyLimit: 8 }),
+  })
+  assert.equal(response.status, 200)
+  assert.equal(writes, 1)
 })
 
 test('POST /conductor/settings validates and persists the retention limit', async () => {

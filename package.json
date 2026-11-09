@@ -16,6 +16,7 @@
     "conductor-store.js",
     "conductor-dynamic.js",
     "client.js",
+    "assets",
     "cordis.patch.yml",
     "skills",
     "README.md",

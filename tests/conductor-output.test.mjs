@@ -11,13 +11,17 @@
 // handler (conductor-dynamic.js) with a fake subprocess service.
 
 import assert from 'node:assert/strict'
-import { EventEmitter } from 'node:events'
-import { readFileSync } from 'node:fs'
+import { EventEmitter, getEventListeners } from 'node:events'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { test } from 'node:test'
+import { after, test } from 'node:test'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
+const testHome = mkdtempSync(join(tmpdir(), 'conductor-output-'))
+process.env.DSH_HOME = testHome
+after(() => rmSync(testHome, { recursive: true, force: true }))
 const MAX_OUTPUT_CHARS = 20_000
 const HEAD_CHARS = Math.floor(MAX_OUTPUT_CHARS * 0.7)
 const TAIL_CHARS = Math.floor(MAX_OUTPUT_CHARS * 0.25)
@@ -130,6 +134,51 @@ function assertLongTranscriptPreserved(output, payload) {
 }
 
 for (const [label, loader] of LOADERS) {
+  test(`${label}: cancellation during executable resolution does not start a process`, async () => {
+    const { state, tool } = loader()
+    const controller = new AbortController()
+    let resolveExecutable
+    let spawned = false
+    state.subprocess = {
+      resolveExecutable: () => new Promise((resolve) => { resolveExecutable = resolve }),
+      spawn() { spawned = true },
+    }
+    const result = tool.execute({ agent: 'codex', task: 't' }, { signal: controller.signal })
+    controller.abort()
+    resolveExecutable('/bin/codex')
+    await assert.rejects(result, /已取消/)
+    assert.equal(spawned, false)
+  })
+
+  test(`${label}: successful dispatch removes its abort listener`, async () => {
+    const { state, tool } = loader()
+    const controller = new AbortController()
+    state.subprocess = fakeSubprocess(['done'])
+    await tool.execute({ agent: 'codex', task: 't' }, { signal: controller.signal })
+    assert.equal(getEventListeners(controller.signal, 'abort').length, 0)
+  })
+
+  test(`${label}: cancellation of a running process terminates it and rejects`, async () => {
+    const { state, tool } = loader()
+    const controller = new AbortController()
+    let terminated = false
+    state.subprocess = {
+      spawn() {
+        return {
+          stdout: new EventEmitter(), stderr: new EventEmitter(), stdin: { end() {} },
+          terminate() { terminated = true }, done: new Promise(() => {}),
+        }
+      },
+    }
+    const result = tool.execute({ agent: 'codex', task: 't' }, { signal: controller.signal })
+    // Allow the asynchronous executable-resolution step to complete.
+    await new Promise((resolve) => setImmediate(resolve))
+    controller.abort()
+    await assert.rejects(result, /已取消/)
+    assert.equal(terminated, true)
+    assert.equal(getEventListeners(controller.signal, 'abort').length, 0)
+  })
+
   test(`${label}: long output keeps the true tail instead of the middle`, async () => {
     const payload = longTranscript()
     assertLongTranscriptPreserved(await dispatch(loader(), payload), payload)

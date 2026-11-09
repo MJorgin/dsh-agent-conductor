@@ -144,3 +144,25 @@ test('detail and limit handling: unknown ids and invalid limits are guarded', ()
   assert.equal(store.setHistoryLimit(MAX_HISTORY_LIMIT + 1), MAX_HISTORY_LIMIT)
   assert.throws(() => store.setHistoryLimit('nope'), /保留条数/)
 })
+
+test('restored data is validated, limited, and cannot resurrect running processes', () => {
+  const valid = {
+    id: 'crew-007', agentId: 'codex', agentName: 'Codex', taskPreview: 'a'.repeat(300),
+    taskLength: 300, cwd: '/x'.repeat(3000), status: 'done', startedAt: 1, endedAt: 2,
+    exitCode: 0, outputChars: 5, stdout: 'private', argv: ['secret'],
+  }
+  const store = createRunStore({ historyLimit: 2, history: [
+    { ...valid, status: 'running' }, valid, valid,
+    { ...valid, id: 'crew-008', status: 'failed' },
+    { ...valid, id: 'crew-009', status: 'done' },
+  ] })
+  const snapshot = store.snapshot()
+  assert.equal(snapshot.active.length, 0)
+  assert.deepEqual(snapshot.history.map((run) => run.id), ['crew-007', 'crew-008'])
+  assert.equal(snapshot.history[0].taskPreview.length, 180)
+  assert.equal(snapshot.history[0].cwd.length, 4096)
+  assert.equal(store.detail('crew-007').run.outputTail, '')
+  assert.deepEqual(store.detail('crew-007').run.argv, [])
+  assert.deepEqual(snapshot.events.map((event) => event.runId), ['crew-008', 'crew-007'])
+  assert.equal(store.begin({ task: 'new' }).id, 'crew-009')
+})

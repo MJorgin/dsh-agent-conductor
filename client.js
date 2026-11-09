@@ -7,8 +7,7 @@
  * same-origin `/conductor` route; it never talks to child processes directly.
  *
  * Registration order is high (1000) so the row sits immediately above the
- * built-in 更多 menu. Avatars are placeholder chibi art for now; the user plans
- * to swap in generated AI 二次元 portraits later.
+ * built-in 更多 menu. The fleet uses original character artwork bundled with the plugin.
  */
 window.__ModuleLoader__.load({
   id: 'dsh-agent-conductor',
@@ -204,8 +203,9 @@ window.__ModuleLoader__.load({
     }
 
     function ensureStyles() {
-      if (typeof document === 'undefined' || document.getElementById(STYLE_ID) !== null) return
-      const style = document.createElement('style')
+      if (typeof document === 'undefined') return
+      const existing = document.getElementById(STYLE_ID)
+      const style = existing ?? document.createElement('style')
       style.id = STYLE_ID
       style.textContent = `
 .dshc-page {
@@ -369,8 +369,63 @@ window.__ModuleLoader__.load({
   .dshc-page { padding: calc(var(--dsh-frame-top-clearance, 48px) + 14px) 18px 30px; }
   .dshc-head { flex-direction: column; }
 }
+
+/* Naval field journal: retain host theme tokens for the working surfaces. */
+.dshc-page { padding-left: 36px; padding-right: 36px; }
+.dshc-inner { max-width: 1380px; }
+.dshc-head { position: relative; overflow: hidden; align-items: center; min-height: 184px; padding: 26px 30px; border-radius: 20px; color: #f4f8f7; background: radial-gradient(ellipse at 17% 5%, #2a6873 0, transparent 42%), linear-gradient(115deg, #102d3a, #0c2333 68%, #163e4a); box-shadow: 0 18px 42px rgba(14,42,53,.16); }
+.dshc-head::after { content: ''; position: absolute; right: -90px; bottom: -160px; width: 380px; height: 380px; border: 1px solid rgba(173,224,221,.16); border-radius: 50%; box-shadow: 0 0 0 35px rgba(173,224,221,.035), 0 0 0 70px rgba(173,224,221,.025), 0 0 0 105px rgba(173,224,221,.02); pointer-events: none; }
+.dshc-headline, .dshc-header-actions { position: relative; z-index: 1; }
+.dshc-headline { gap: 22px; }
+.dshc-captain-wrap { position: relative; flex: none; display: block; }
+.dshc-captain-wrap .dshc-mascot { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dshc-captain { position: absolute; z-index: 1; width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 8px 18px rgba(0,0,0,.24)); }
+.dshc-eyebrow, .dshc-section-kicker { font: 700 10px/1.2 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .16em; }
+.dshc-eyebrow { color: #90c6c4; margin-bottom: 10px; }
+.dshc-headtext h1 { font-size: 27px; font-weight: 700; letter-spacing: .04em; }
+.dshc-headtext p { color: #b4ccce; margin-top: 7px; }
+.dshc-chips { margin-top: 16px; }
+.dshc-chip { color: #edf7f4; border-color: rgba(218,246,240,.14); background: rgba(255,255,255,.08); padding: 5px 10px; }
+.dshc-header-actions { align-self: flex-end; flex-wrap: wrap; justify-content: flex-end; }
+.dshc-head .dshc-settings { color: #d4e6e3; background: rgba(5,24,32,.34); border-color: rgba(218,246,240,.16); }
+.dshc-head .dshc-settings input { background: rgba(255,255,255,.10); color: white; border-color: rgba(255,255,255,.17); }
+.dshc-head .dshc-btn { color: #e7f3f1; background: rgba(255,255,255,.1); border-color: rgba(255,255,255,.17); }
+.dshc-head .dshc-btn-primary { background: #d7ede3; color: #123b3d; border-color: transparent; }
+.dshc-head .dshc-btn:hover:not(:disabled) { background: #badbd1; color: #123b3d; }
+.dshc-section-title { align-items: end; margin: 34px 2px 14px; }
+.dshc-section-title h2 { font-size: 19px; margin-top: 6px; letter-spacing: .02em; }
+.dshc-section-kicker { color: #508b8c; }
+.dshc-section-title > span { font: 600 10px/1.2 ui-monospace, monospace; letter-spacing: .12em; }
+.dshc-fleet { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.dshc-card { min-width: 0; gap: 11px; padding: 16px; border-radius: 14px; background: var(--dsw-alias-bg-elevated, #fff); box-shadow: 0 3px 14px rgba(17,43,52,.035); }
+.dshc-card::before { content: ''; position: absolute; top: 0; left: 16px; width: 34px; height: 3px; border-radius: 0 0 3px 3px; background: var(--crew-accent, #87a7a4); opacity: .85; }
+.dshc-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(17,43,52,.1); }
+.dshc-card { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
+.dshc-card[data-status="running"] { border-color: #65bfa7; box-shadow: 0 0 0 1px rgba(57,185,128,.12), 0 10px 24px rgba(57,185,128,.10); }
+.dshc-card[data-status="running"] .dshc-avatar { animation: dshc-float 2.8s ease-in-out infinite; }
+.dshc-card[data-status="running"] .dshc-pill .dshc-dot { animation: dshc-pulse 1.6s ease-in-out infinite; }
+.dshc-cardhead { gap: 12px; }
+.dshc-name { font-size: 14px; }
+.dshc-callsign { margin-top: 4px; font-size: 10px; letter-spacing: .04em; }
+.dshc-avatar { position: relative; border-radius: 50%; overflow: hidden; background: #d5edf7; }
+.dshc-avatar-atlas { position: absolute; width: 400%; height: 300%; max-width: none; object-fit: fill; }
+.dshc-task { min-height: 0; line-height: 1.55; }
+.dshc-card[data-status="idle"] .dshc-meta { display: none; }
+.dshc-card[data-status="idle"] .dshc-actions { padding-top: 0; border-top: 0; }
+.dshc-actions { border-top: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.06)); padding-top: 10px; }
+.dshc-actions-hint { color: #679897; }
+.dshc-log { border-radius: 14px; background: var(--dsw-alias-bg-elevated, #fff); }
+.dshc-empty { padding: 30px 20px; }
+.dshc-foot { text-align: left; margin: 26px 2px; }
+.dshc-btn:focus-visible, .dshc-logrow:focus-visible, .dshc-settings input:focus-visible { outline: 2px solid #51bda9; outline-offset: 2px; }
+@keyframes dshc-float { 50% { transform: translateY(-3px); } }
+@keyframes dshc-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .dshc-card, .dshc-avatar, .dshc-dot { animation: none !important; transition: none !important; } }
+@media (max-width: 900px) { .dshc-head { align-items: flex-start; flex-direction: column; gap: 18px; } .dshc-header-actions { align-self: flex-start; justify-content: flex-start; } }
+@media (max-width: 760px) { .dshc-page { padding-left: 18px; padding-right: 18px; } .dshc-head { padding: 22px; } .dshc-headline { gap: 12px; } .dshc-captain-wrap { width: 88px !important; height: 88px !important; } .dshc-headtext h1 { font-size: 22px; } .dshc-settings { white-space: normal; flex-wrap: wrap; } .dshc-fleet { grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); } }
+
       `
-      document.head.appendChild(style)
+      if (existing === null) document.head.appendChild(style)
     }
 
     /* ------------------------------ artwork ------------------------------ */
@@ -381,13 +436,15 @@ window.__ModuleLoader__.load({
         stroke: 'currentColor', strokeWidth: 1.3, strokeLinecap: 'round', strokeLinejoin: 'round',
         'aria-hidden': 'true',
       },
-        h('path', { d: 'M2.1 8.5c2.3-3 5.2-4.5 8.5-4.5 2 0 3.9.6 5.4 1.8-1.2 3.4-4.5 5.6-8.3 5.6-2.2 0-4.2-.9-5.6-2.9Z' }),
-        h('path', { d: 'M2.1 8.5 1 6.1l3.2 1.2M2.1 8.5 1.3 11l3.2-1.4' }),
-        h('circle', { cx: 10.4, cy: 7.6, r: 0.75, fill: 'currentColor', stroke: 'none' }))
+        h('path', { d: 'M3 7.2 4.4 3.6C5.3 2.7 6.6 2.2 8 2.2s2.7.5 3.6 1.4L13 7.2' }),
+        h('path', { d: 'M2.3 7.4c1.7-.7 3.6-1 5.7-1s4 .3 5.7 1l-.6 2.1H2.9zM4 9.7v1.2c0 1.1 1.8 2.6 4 2.6s4-1.5 4-2.6V9.7' }),
+        h('path', { d: 'M7.1 4.6h1.8M8 3.8v1.6' }))
     }
 
     function CommanderMascot({ size = 92 }) {
-      return h('svg', { viewBox: '0 0 96 96', width: size, height: size, 'aria-hidden': 'true', className: 'dshc-mascot' },
+      return h('span', { className: 'dshc-captain-wrap', style: { width: size, height: size } },
+        h('img', { className: 'dshc-captain', src: '/conductor/assets/captain.webp', alt: '', onError: (event) => { event.currentTarget.style.display = 'none' } }),
+        h('svg', { viewBox: '0 0 96 96', width: size, height: size, 'aria-hidden': 'true', className: 'dshc-mascot' },
         h('defs', null,
           h('linearGradient', { id: 'dshc-sea', x1: '0', y1: '0', x2: '0', y2: '1' },
             h('stop', { offset: '0%', stopColor: '#1d6f8c' }),
@@ -415,7 +472,7 @@ window.__ModuleLoader__.load({
         h('ellipse', { cx: 65, cy: 56, rx: 4, ry: 2.2, fill: '#ff8fa6', opacity: 0.5 }),
         h('path', { d: 'M44 57c2.6 2.6 6.4 2.6 9 0', fill: 'none', stroke: '#a35c3f', strokeWidth: 2.2, strokeLinecap: 'round' }),
         h('circle', { cx: 72, cy: 24, r: 3.2, fill: '#d9f0ff', opacity: 0.55 }),
-        h('circle', { cx: 80, cy: 17, r: 2.1, fill: '#d9f0ff', opacity: 0.4 }))
+        h('circle', { cx: 80, cy: 17, r: 2.1, fill: '#d9f0ff', opacity: 0.4 })))
     }
 
     function avatarEyes(offsetY, gear) {
@@ -500,10 +557,10 @@ window.__ModuleLoader__.load({
     function CrewAvatar({ crew, size = 46, status = 'idle' }) {
       const gear = avatarGear(crew.gear)
       const showEyes = true
-      return h('span', { className: 'dshc-avatar', style: { width: size, height: size } },
+      const index = Math.max(0, CREW.findIndex((item) => item.id === crew.id))
+      return h('span', { className: 'dshc-avatar', style: { width: size, height: size }, role: 'img', 'aria-label': t('avatar.alt', { name: crew.name }) },
         h('svg', {
-          viewBox: '0 0 64 64', width: size, height: size, role: 'img',
-          'aria-label': t('avatar.alt', { name: crew.name }),
+          viewBox: '0 0 64 64', width: size, height: size, 'aria-hidden': 'true',
         },
           h('circle', { cx: 32, cy: 34, r: 29, fill: crew.suit }),
           h('path', { d: 'M6 44c8-4 14-4 22 0s14 4 22 0 8-3 8-3v17H6Z', fill: crew.accent, opacity: 0.14 }),
@@ -525,7 +582,8 @@ window.__ModuleLoader__.load({
           h('ellipse', { cx: 41.5, cy: 42, rx: 3.2, ry: 1.8, fill: '#ff9eb0', opacity: 0.5 }),
           h('path', { d: 'M29.5 45c1.5 1.7 3.5 1.7 5 0', fill: 'none', stroke: '#8c4a3c', strokeWidth: 1.4, strokeLinecap: 'round' }),
           h('circle', { cx: 52, cy: 52, r: 7.6, fill: '#ffffff' }),
-          h('circle', { cx: 52, cy: 52, r: 5.2, fill: STATUS_COLORS[status] ?? STATUS_COLORS.idle }))
+          h('circle', { cx: 52, cy: 52, r: 5.2, fill: STATUS_COLORS[status] ?? STATUS_COLORS.idle })),
+        h('img', { className: 'dshc-avatar-atlas', src: '/conductor/assets/crew-atlas.webp', alt: '', style: { left: `${-(index % 4) * 100}%`, top: `${-Math.floor(index / 4) * 100}%` }, onError: (event) => { event.currentTarget.style.display = 'none' } })
       )
     }
 
@@ -623,9 +681,9 @@ window.__ModuleLoader__.load({
     function FleetCard({ crew, run, nowMs, busyId, onDetail, onCancel }) {
       const status = statusKey(run)
       const elapsed = elapsedOf(run, nowMs)
-      return h('div', { className: 'dshc-card', 'data-status': status === 'idle' ? 'idle' : status },
+      return h('div', { className: 'dshc-card', 'data-status': status === 'idle' ? 'idle' : status, style: { '--crew-accent': crew.accent } },
         h('div', { className: 'dshc-cardhead' },
-          h(CrewAvatar, { crew, size: 46, status: status === 'idle' ? 'idle' : status }),
+          h(CrewAvatar, { crew, size: 62, status: status === 'idle' ? 'idle' : status }),
           h('div', { className: 'dshc-id' },
             h('div', { className: 'dshc-name' }, crew.name),
             h('div', { className: 'dshc-callsign' }, crew.id)),
@@ -638,8 +696,8 @@ window.__ModuleLoader__.load({
               h('span', null, `${t('meta.output')} ${(run.outputChars ?? 0).toLocaleString()} ${t('meta.chars')}`),
               typeof run.exitCode === 'number' ? h('span', null, `${t('meta.exit')} ${run.exitCode}`) : null,
               run.status !== 'running' ? h('span', null, formatAgo(run.endedAt, nowMs)) : null),
-        h('pre', { className: run !== null && run.outputTail ? 'dshc-tail' : 'dshc-tail dshc-tail-empty' },
-          run !== null && run.outputTail ? run.outputTail : t('tail.empty')),
+        run !== null ? h('pre', { className: run.outputTail ? 'dshc-tail' : 'dshc-tail dshc-tail-empty' },
+          run.outputTail || t('tail.empty')) : null,
         h('div', { className: 'dshc-actions' },
           run === null
             ? h('span', { className: 'dshc-actions-hint' }, t('hint.dispatch'))
@@ -673,8 +731,8 @@ window.__ModuleLoader__.load({
           : h('span', { className: 'dshc-logtime' }, formatAgo(event.at, nowMs)))
     }
 
-    function DetailDrawer({ run, error, busyId, onClose, onCancel }) {
-      if (run === null && error === null) return null
+    function DetailDrawer({ open, run, error, busyId, onClose, onCancel }) {
+      if (!open) return null
       const status = run === null ? 'failed' : statusKey(run)
       return h('div', { className: 'dshc-mask', onClick: onClose },
         h('div', { className: 'dshc-drawer', onClick: (event) => event.stopPropagation() },
@@ -686,7 +744,7 @@ window.__ModuleLoader__.load({
             h('button', { type: 'button', className: 'dshc-btn', onClick: onClose }, t('btn.close'))),
           error !== null
             ? h('div', { className: 'dshc-banner' }, error)
-            : [
+            : run === null ? h('div', { className: 'dshc-notice' }, t('detail.loading')) : [
                 run.status === 'running' ? h('div', { className: 'dshc-notice', style: { marginTop: '12px' } }, t('detail.running')) : null,
                 h('dl', { className: 'dshc-kv' },
                   h('dt', null, t('detail.id')), h('dd', null, run.id),
@@ -734,6 +792,7 @@ window.__ModuleLoader__.load({
       const [loadError, setLoadError] = React.useState(null)
       const [tick, setTick] = React.useState(0)
       const [nowMs, setNowMs] = React.useState(Date.now())
+      const [detailId, setDetailId] = React.useState(null)
       const [detail, setDetail] = React.useState(null)
       const [detailError, setDetailError] = React.useState(null)
       const [busyId, setBusyId] = React.useState(null)
@@ -780,18 +839,37 @@ window.__ModuleLoader__.load({
 
       const refresh = () => setTick((value) => value + 1)
 
-      const openDetail = async (id) => {
-        setDetailError(null)
-        try {
-          const body = await api(`/run?id=${encodeURIComponent(id)}`)
-          setDetail(body.run ?? null)
-        } catch (error) {
-          setDetail(null)
-          setDetailError(error.message ?? String(error))
+      // Keep an open report current; ignore late replies after it is closed or changed.
+      React.useEffect(() => {
+        if (detailId === null) return undefined
+        let alive = true
+        let timer
+        const load = async () => {
+          if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+            if (alive) timer = setTimeout(load, POLL_MS)
+            return
+          }
+          try {
+            const body = await api(`/run?id=${encodeURIComponent(detailId)}`)
+            if (alive) { setDetail(body.run ?? null); setDetailError(body.run ? null : t('detail.missing')) }
+          } catch (error) {
+            if (alive) setDetailError(error.message ?? String(error))
+          } finally {
+            if (alive) timer = setTimeout(load, POLL_MS)
+          }
         }
+        load()
+        return () => { alive = false; clearTimeout(timer) }
+      }, [detailId])
+
+      const openDetail = (id) => {
+        setDetail(null)
+        setDetailError(null)
+        setDetailId(id)
       }
 
       const closeDetail = () => {
+        setDetailId(null)
         setDetail(null)
         setDetailError(null)
       }
@@ -840,14 +918,22 @@ window.__ModuleLoader__.load({
       const runs = crewState(state)
       const stats = readStats(state)
       const historyLimit = Number(state?.settings?.historyLimit) || 50
-      const events = Array.isArray(state?.events) ? state.events.slice(-historyLimit).reverse() : []
+      // One row per run: do not count both the start and completion as two logs.
+      const events = [...(Array.isArray(state?.active) ? state.active : []),
+        ...(Array.isArray(state?.history) ? state.history : [])]
+        .sort((a, b) => (b.endedAt ?? b.startedAt) - (a.endedAt ?? a.startedAt))
+        .slice(0, historyLimit)
+        .map((run) => ({ type: run.status, runId: run.id, agentId: run.agentId,
+          agentName: run.agentName, taskPreview: run.taskPreview,
+          at: run.endedAt ?? run.startedAt, durationMs: run.durationMs }))
 
       return h('div', { className: 'dshc-page' },
         h('div', { className: 'dshc-inner' },
           h('div', { className: 'dshc-head' },
             h('div', { className: 'dshc-headline' },
-              h(CommanderMascot, { size: 78 }),
+              h(CommanderMascot, { size: 142 }),
               h('div', { className: 'dshc-headtext' },
+                h('div', { className: 'dshc-eyebrow', 'aria-hidden': 'true' }, 'FAT FISH FLEET  /  COMMAND CENTER'),
                 h('h1', null, t('title')),
                 h('p', null, t('subtitle')),
                 h('div', { className: 'dshc-chips' },
@@ -880,8 +966,8 @@ window.__ModuleLoader__.load({
             ? h('div', { className: 'dshc-notice' }, notice)
             : null,
           h('div', { className: 'dshc-section-title' },
-            h('h2', null, t('section.fleet')),
-            h('span', null, t('settings.hint'))),
+            h('div', null, h('div', { className: 'dshc-section-kicker', 'aria-hidden': 'true' }, '01 / THE CREW'), h('h2', null, t('section.fleet'))),
+            h('span', null, `${CREW.length} AGENTS`)),
           h('div', { className: 'dshc-fleet' },
             CREW.map((crew) => h(FleetCard, {
               key: crew.id,
@@ -893,7 +979,7 @@ window.__ModuleLoader__.load({
               onCancel: cancelRun,
             }))),
           h('div', { className: 'dshc-section-title' },
-            h('h2', null, t('section.log')),
+            h('div', null, h('div', { className: 'dshc-section-kicker', 'aria-hidden': 'true' }, '02 / SHIP LOG'), h('h2', null, t('section.log'))),
             h('span', null, events.length === 0 ? '' : t('section.log.hint', { n: historyLimit }))),
           h('div', { className: 'dshc-log' },
             events.length === 0
@@ -907,6 +993,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'dshc-foot' },
             [t('footer.note'), state?.version ? `v${state.version}` : null].filter(Boolean).join(' · '))),
         h(DetailDrawer, {
+          open: detailId !== null,
           run: detail,
           error: detailError,
           busyId,

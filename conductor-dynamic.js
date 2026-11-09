@@ -181,7 +181,15 @@ return {
         if (!subprocess) {
           throw new Error('宿主 subprocess 服务不可用')
         }
-        const spawnArgv = await resolveArgv0(subprocess, agent, argv)
+        if (exec.signal?.aborted) throw new Error('已取消')
+        let spawnArgv
+        try {
+          spawnArgv = await resolveArgv0(subprocess, agent, argv)
+        } catch (error) {
+          if (exec.signal?.aborted) throw new Error('已取消')
+          throw error
+        }
+        if (exec.signal?.aborted) throw new Error('已取消')
         let child
         try {
           child = subprocess.spawn({
@@ -228,15 +236,16 @@ return {
         })
         try { child.stdin?.end() } catch { /* 忽略 */ }
         const kill = () => { try { child.terminate?.() } catch { /* 忽略 */ } }
-        const onAbort = () => kill()
-        exec.signal?.addEventListener?.('abort', onAbort, { once: true })
         let timer
         const timedOut = new Promise((_, reject) => {
           timer = setTimeout(() => { kill(); reject(new Error('TIMEOUT')) }, 10 * 60 * 1000)
         })
+        let onAbort
         const aborted = new Promise((_, reject) => {
           if (!exec.signal) return
-          exec.signal.addEventListener('abort', () => reject(new Error('已取消')), { once: true })
+          onAbort = () => { kill(); reject(new Error('已取消')) }
+          exec.signal.addEventListener('abort', onAbort, { once: true })
+          if (exec.signal.aborted) onAbort()
         })
         try {
           const outcome = await Promise.race([child.done, aborted, timedOut])
@@ -257,7 +266,7 @@ return {
           throw error
         } finally {
           clearTimeout(timer)
-          exec.signal?.removeEventListener?.('abort', onAbort)
+          if (onAbort) exec.signal?.removeEventListener?.('abort', onAbort)
         }
         return clipOutput(out, tail, total)
       },

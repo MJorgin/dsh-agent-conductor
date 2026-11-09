@@ -24,9 +24,38 @@ const VIEW_OUTPUT_CHARS = 1_600
 const VIEW_STDERR_CHARS = 800
 const DETAIL_OUTPUT_CHARS = 4_000
 const DETAIL_STDERR_CHARS = 4_000
-const MAX_EVENTS = 80
+// Retain room for both a start and a finish for each configurable history row.
+const MAX_EVENTS = MAX_HISTORY_LIMIT * 2
 
 const FINAL_STATUSES = new Set(['done', 'failed', 'cancelled', 'timeout'])
+
+// Only the fields required to identify and summarize a completed run are
+// stored on disk. Full command arguments and output may contain credentials.
+function persistable(run) {
+  return {
+    id: run.id, agentId: run.agentId, agentName: run.agentName,
+    taskPreview: run.taskPreview, taskLength: run.taskLength, cwd: run.cwd.slice(0, 4096),
+    status: run.status, startedAt: run.startedAt, endedAt: run.endedAt,
+    exitCode: run.exitCode, outputChars: run.outputChars, error: run.error,
+  }
+}
+
+function restoreRun(value) {
+  if (!value || typeof value !== 'object' || !/^crew-\d{1,12}$/.test(value.id)
+      || !FINAL_STATUSES.has(value.status)
+      || !Number.isFinite(value.startedAt) || !Number.isFinite(value.endedAt)
+      || value.startedAt < 0 || value.endedAt < value.startedAt) return null
+  const count = (n) => Number.isSafeInteger(n) && n >= 0 ? n : 0
+  return {
+    id: value.id, agentId: preview(value.agentId, 80), agentName: preview(value.agentName, 120),
+    taskPreview: preview(value.taskPreview, TASK_PREVIEW_CHARS), taskLength: count(value.taskLength),
+    cwd: typeof value.cwd === 'string' ? value.cwd.slice(0, 4096) : '',
+    status: value.status, startedAt: value.startedAt, endedAt: value.endedAt,
+    exitCode: Number.isSafeInteger(value.exitCode) ? value.exitCode : null,
+    outputChars: count(value.outputChars), error: preview(value.error, ERROR_PREVIEW_CHARS) || null,
+    argv: [], stdout: '', stderr: '', cancelRequested: false, cancel: null, lastOutputAt: null,
+  }
+}
 
 function preview(text, max) {
   if (typeof text !== 'string') return ''
@@ -53,6 +82,8 @@ export function normalizeHistoryLimit(value) {
  * @param {object} [options]
  * @param {number} [options.historyLimit]  initial retained-run count
  * @param {() => number} [options.now]     injectable clock (tests)
+ * @param {object[]} [options.history]     previously completed run summaries
+ * @param {(history: object[], limit: number) => void} [options.onHistoryChange]
  */
 export function createRunStore(options = {}) {
   const now = typeof options.now === 'function' ? options.now : () => Date.now()
@@ -61,6 +92,34 @@ export function createRunStore(options = {}) {
   const active = new Map()
   const history = []
   const events = []
+
+  if (Array.isArray(options.history)) {
+    const seen = new Set()
+    // Bound work even when the saved file has been externally modified.
+    for (const candidate of options.history.slice(0, MAX_HISTORY_LIMIT)) {
+      const run = restoreRun(candidate)
+      if (!run || seen.has(run.id)) continue
+      seen.add(run.id)
+      seq = Math.max(seq, Number(run.id.slice(5)))
+      history.push(run)
+      if (history.length >= historyLimit) break
+    }
+    // The UI reads events oldest-first and reverses them for its log. Restore a
+    // single completion event per persisted run; running processes do not survive
+    // a host restart and are deliberately never resurrected.
+    for (const run of [...history].reverse()) {
+      events.push({
+        type: run.status, runId: run.id, agentId: run.agentId,
+        agentName: run.agentName, taskPreview: run.taskPreview, at: run.endedAt,
+        durationMs: run.endedAt - run.startedAt, exitCode: run.exitCode,
+      })
+    }
+  }
+
+  function exportHistory() { return history.map(persistable) }
+  function persistHistory() {
+    if (typeof options.onHistoryChange === 'function') options.onHistoryChange(exportHistory(), historyLimit)
+  }
 
   function pushEvent(event) {
     events.push(event)
@@ -180,11 +239,12 @@ export function createRunStore(options = {}) {
     active.delete(runId)
     run.cancel = null
     run.status = status
-    run.endedAt = now()
+    run.endedAt = Math.max(run.startedAt, now())
     if (typeof extra.exitCode === 'number') run.exitCode = extra.exitCode
     run.error = extra.error === undefined ? null : preview(String(extra.error), ERROR_PREVIEW_CHARS)
     history.unshift(run)
     trimHistory()
+    persistHistory()
     pushEvent({
       type: status,
       runId: run.id,
@@ -216,6 +276,7 @@ export function createRunStore(options = {}) {
     }
     historyLimit = next
     trimHistory()
+    persistHistory()
     return historyLimit
   }
 
@@ -245,6 +306,7 @@ export function createRunStore(options = {}) {
     detail,
     snapshot,
     setHistoryLimit,
+    exportHistory,
     getHistoryLimit: () => historyLimit,
   }
 }
