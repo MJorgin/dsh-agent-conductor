@@ -59,9 +59,10 @@ function makeCtx() {
       register(namespace, dictionary) { dictionaries.push({ namespace, dictionary }) },
       bind(namespace) {
         const found = dictionaries.find((entry) => entry.namespace === namespace)
-        return (key) => found?.dictionary?.zh?.[key] ?? key
+        return (key, vars = {}) => String(found?.dictionary?.zh?.[key] ?? key).replace(/\{(\w+)\}/g, (match, name) => vars[name] === undefined ? match : String(vars[name]))
       },
     },
+    uiWorkspace: { startSession() {} },
     effect(callback, label) { callback() },
     slots: {
       inject(name, register) {
@@ -91,7 +92,7 @@ test('client module exposes the bundle contract', () => {
   const exports = makeExports(fakeReact())
   assert.equal(exports.name, MODULE_ID)
   assert.equal(typeof exports.apply, 'function')
-  assert.deepEqual(exports.inject, ['slots', 'locale'])
+  assert.deepEqual(exports.inject, ['slots', 'locale', 'uiWorkspace'])
 })
 
 test('apply registers the panel row above 更多 and its main page', () => {
@@ -171,4 +172,132 @@ test('the initial page render produces the war-room header and fleet', () => {
   const text = React.render(React.createElement(main.component))
   assert.ok(text.includes('大肥鱼指挥官'), 'page header renders the panel name')
   assert.ok(text.includes('指挥官'), 'localized panel copy is available')
+})
+
+
+// The renderer retains App state across user actions, while effects are held so
+// the tests can supply the exact availability response without real network or
+// timers. Nothing is dispatched until the user reviews and sends a DSH draft.
+function makeInteractionHarness(availability, testContext, snapshot = null) {
+  const network = []
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (...args) => { network.push(args); throw new Error('unexpected network call') }
+  testContext.after(() => { globalThis.fetch = originalFetch })
+  const state = []
+  let cursor = 0
+  const React = {
+    createElement(type, props, ...children) {
+      const merged = { ...(props ?? {}) }
+      if (children.length === 1) merged.children = children[0]
+      else if (children.length > 1) merged.children = children
+      return { type, props: merged }
+    },
+    useState(initial) {
+      const index = cursor++
+      if (!(index in state)) state[index] = index === 0 ? snapshot : index === 10 ? availability : (typeof initial === 'function' ? initial() : initial)
+      return [state[index], (value) => { state[index] = typeof value === 'function' ? value(state[index]) : value }]
+    },
+    useEffect() {},
+    useCallback(callback) { return callback },
+  }
+  const { ctx, registrations } = makeCtx()
+  const calls = []
+  ctx.uiWorkspace.startSession = (...args) => calls.push(args)
+  makeExports(React).apply(ctx)
+  const main = registrations.find((entry) => entry.spec.name === 'main')
+  assert.equal(typeof main.spec.inject, 'function')
+  const props = main.spec.inject()
+  const expand = (node) => {
+    if (Array.isArray(node)) return node.flatMap((child) => expand(child))
+    if (node === null || node === undefined || typeof node === 'boolean') return []
+    if (typeof node === 'string' || typeof node === 'number') return [String(node)]
+    if (typeof node.type === 'function') return expand(node.type(node.props ?? {}))
+    return [{ ...node, children: expand(node.props?.children) }]
+  }
+  const render = () => { cursor = 0; return expand(React.createElement(main.component, props)) }
+  const descendants = (tree) => tree.flatMap((item) => typeof item === 'string' ? [] : [item, ...descendants(item.children)])
+  const textOf = (node) => typeof node === 'string' ? node : node.children.map(textOf).join('')
+  const card = (tree, name) => descendants(tree).find((node) => node.props.className === 'dshc-card' && descendants([node]).some((child) => child.props.className === 'dshc-name' && textOf(child) === name))
+  const button = (tree, label) => descendants(tree).find((node) => node.type === 'button' && textOf(node) === label)
+  return { calls, network, render, card, button, descendants, textOf }
+}
+
+test('available CLI offers dispatch; missing CLI offers connect; opening a dialog does not execute', (t) => {
+  const ui = makeInteractionHarness({ codex: { id: 'codex', status: 'available' }, 'claude-code': { id: 'claude-code', status: 'missing' } }, t)
+  const tree = ui.render()
+  const codex = ui.card(tree, 'Codex')
+  const claude = ui.card(tree, 'Claude Code')
+  assert.ok(ui.button([codex], '派遣'))
+  assert.equal(ui.button([codex], '连接'), undefined)
+  assert.ok(ui.button([claude], '连接'))
+  assert.equal(ui.button([claude], '派遣'), undefined)
+  assert.match(ui.textOf(codex), /登录待确认/)
+  assert.match(ui.textOf(codex), /待命/)
+  assert.match(ui.textOf(claude), /等待连接/)
+  ui.button([claude], '连接').props.onClick()
+  assert.deepEqual(ui.calls, [])
+  const dialog = ui.descendants(ui.render()).find((node) => node.props.role === 'dialog')
+  assert.ok(dialog)
+  assert.match(ui.textOf(dialog), /不会自动安装或执行/)
+  assert.deepEqual(ui.calls, [])
+  assert.deepEqual(ui.network, [])
+})
+
+test('connect opens a reviewable draft with append semantics, without running a command', (t) => {
+  const ui = makeInteractionHarness({ 'claude-code': { id: 'claude-code', status: 'missing' } }, t)
+  const tree = ui.render()
+  ui.button([ui.card(tree, 'Claude Code')], '连接').props.onClick()
+  ui.button(ui.render(), '打开对话并填写').props.onClick()
+  assert.equal(ui.calls.length, 1)
+  const [workspace, options] = ui.calls[0]
+  assert.equal(workspace, undefined)
+  assert.equal(options.whenDraftExists, 'append')
+  assert.match(options.prompt, /Claude Code/)
+  assert.match(options.prompt, /等待我确认/)
+  assert.match(options.prompt, /不要直接安装/)
+  assert.deepEqual(ui.network, [])
+})
+
+test('dispatch opens an editable example and only creates a draft with the chosen agent and task', (t) => {
+  const ui = makeInteractionHarness({ codex: { id: 'codex', status: 'available' } }, t)
+  const tree = ui.render()
+  ui.button([ui.card(tree, 'Codex')], '派遣').props.onClick()
+  let dialogTree = ui.render()
+  const textarea = ui.descendants(dialogTree).find((node) => node.type === 'textarea')
+  assert.match(textarea.props.value, /README/)
+  assert.deepEqual(ui.calls, [])
+  textarea.props.onChange({ target: { value: '只读检查项目结构' } })
+  dialogTree = ui.render()
+  ui.button(dialogTree, '打开对话并填写').props.onClick()
+  assert.equal(ui.calls.length, 1)
+  const [workspace, options] = ui.calls[0]
+  assert.equal(workspace, undefined)
+  assert.equal(options.whenDraftExists, 'append')
+  assert.match(options.prompt, /conductor_dispatch/)
+  assert.match(options.prompt, /Codex/)
+  assert.match(options.prompt, /只读检查项目结构/)
+  assert.deepEqual(ui.network, [])
+})
+
+
+test('an active CLI cannot be dispatched again from its card', (t) => {
+  const snapshot = { active: [{ id: 'crew-001', agentId: 'codex', status: 'running', startedAt: 1, endedAt: null, taskPreview: 'test', outputChars: 0 }], history: [], settings: { historyLimit: 50 } }
+  const ui = makeInteractionHarness({ codex: { id: 'codex', status: 'available' } }, t, snapshot)
+  const card = ui.card(ui.render(), 'Codex')
+  assert.equal(ui.button([card], '派遣'), undefined)
+  assert.ok(ui.button([card], '终止'))
+  assert.deepEqual(ui.network, [])
+})
+
+test('empty task cannot be opened as a dispatch draft', (t) => {
+  const ui = makeInteractionHarness({ codex: { id: 'codex', status: 'available' } }, t)
+  const tree = ui.render()
+  ui.button([ui.card(tree, 'Codex')], '派遣').props.onClick()
+  let dialogTree = ui.render()
+  const textarea = ui.descendants(dialogTree).find((node) => node.type === 'textarea')
+  textarea.props.onChange({ target: { value: '  ' } })
+  dialogTree = ui.render()
+  assert.equal(ui.button(dialogTree, '打开对话并填写').props.disabled, true)
+  assert.deepEqual(ui.calls, [])
+  assert.deepEqual(ui.network, [])
 })

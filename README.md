@@ -174,15 +174,17 @@ python3 skills/conductor/scripts/dispatch.py doctor
 
 The bundle now ships a browser half too: a **指挥官** row in the left sidebar, placed immediately above the built-in **更多** menu — the panel's Chinese display name is **大肥鱼指挥官** (Big Fat Fish Commander). It turns dispatches into a small "deep-sea war room":
 
-- **Fleet** — 11 original AI-generated naval crew portraits, a blue-haired whale captain, and a compact card per CLI. Active cards animate subtly and show the task, timer and stdout tail; reduced-motion preferences are respected;
+- **Fleet** — a blue-haired whale captain and 11 AI-generated portraits inspired by the supplied character references. Cards show CLI availability and the latest dispatch; active cards animate subtly, respecting reduced-motion preferences;
+- **Connect and dispatch** — the panel checks whether each CLI executable can be resolved. Choose **Connect** for a guided sign-in/install draft, or **Dispatch** for an editable task example. Opening a draft never sends it or runs a CLI; review the selected workspace before sending;
 - **Ship log** — the last N runs (default 50, adjustable in the header). Completed-run summaries and the retention setting are saved locally in `~/.dsh/conductor-crew.json` and restored after a restart; click a row for details;
 - **Detail & terminate** — while the host is running, inspect argv, working directory, duration, exit code, stdout/stderr tails and errors; the 终止 button stops a running process tree. An open report refreshes automatically;
 - The page polls the same-origin `/conductor/state` route, and only while it is visible; nothing leaves the machine.
 
 Notes:
 
+- A detected executable does **not** prove login, entitlement, or successful execution. The panel labels authentication as unverified; installation and login still require the user’s action.
 - Only dispatches that go through the bundle's `conductor_dispatch` tool appear in the panel. The skill's `dispatch.py` runs as a plain subprocess and registers nothing — by design.
-- The portraits are original AI-generated interpretations, not official vendor characters. They are bundled locally; the earlier SVG avatars remain as fallbacks. The character direction was inspired by [dsh-pet](https://github.com/PC2005-cloud/dsh-pet); no artwork from that project is bundled.
+- The portraits are AI-generated interpretations informed by supplied reference images, not official vendor characters. They are bundled locally; the earlier SVG avatars remain as fallbacks. The character direction was inspired by [dsh-pet](https://github.com/PC2005-cloud/dsh-pet); no artwork from that project is bundled.
 - For privacy and bounded storage, restored history contains summaries only: command arguments and output tails are kept in memory and do not survive a restart. Task previews, working directories and error summaries **are** written locally and may contain sensitive text.
 - Headless/CLI profiles without a web server still get the tool: the route is registered lazily and simply never used.
 

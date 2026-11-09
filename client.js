@@ -56,6 +56,34 @@ window.__ModuleLoader__.load({
         'state.offline.hint': '检查 Web 服务是否可用后重试。',
         'btn.refresh': '刷新',
         'btn.detail': '详情',
+        'btn.connect': '连接',
+        'btn.checkLogin': '检查登录',
+        'btn.dispatch': '派遣',
+        'btn.recheck': '重新检测',
+        'btn.openChat': '打开对话并填写',
+        'availability.available': '已检测到 CLI · 登录待确认',
+        'availability.missing': '等待连接 · 未找到 CLI',
+        'availability.unsupported': '等待连接 · 入口不受支持',
+        'availability.unknown': '连接状态待检测',
+        'availability.loading': '正在检测 CLI…',
+        'connect.title': '连接 {name}',
+        'connect.intro': '先检查本机 CLI，再在 DSH 对话中完成安装或登录。不会自动安装或执行命令。',
+        'connect.skill': '使用技能',
+        'connect.skillName': 'Conductor · 外部智能体派遣',
+        'connect.found': '已找到可执行程序；登录状态需在对话中确认。',
+        'connect.missing': '尚未找到可用程序。可在对话中获取安装与登录指导。',
+        'connect.unsupported': '找到的 Windows 命令入口暂不支持直接运行，请在对话中了解替代方式。',
+        'connect.unknown': '暂时无法确认 CLI 状态，请重新检测或在对话中排查。',
+        'connect.install': '安装参考',
+        'connect.note': '打开对话后，请核对所选工作区和预填内容，再自行发送；安装与登录按 DSH 的授权流程进行。',
+        'dispatch.title': '派遣给 {name}',
+        'dispatch.intro': '先写清任务。打开对话后核对工作区，可修改示例，再自行发送。',
+        'dispatch.task': '任务内容',
+        'dispatch.example': '请阅读当前工作区的 README，概括项目用途、主要功能和本地运行方式。只做分析，不修改文件。',
+        'dispatch.note': '派遣会使用目标 CLI 的账号额度；目标无法看到本对话的上下文，请写明所需背景。',
+        'chat.unavailable': '当前 DSH 版本无法打开对话，请在会话中使用 conductor 技能。',
+        'chat.connectPrompt': '请使用 conductor 技能，帮我检查 {name} CLI 是否安装并已登录，说明连接步骤；如果未安装，请先向我说明安装方式并等待我确认，不要直接安装。',
+        'chat.dispatchPrompt': '请使用 conductor_dispatch 工具将以下任务派给 {name}（{id}），并在完成后汇总结果。请先确认工作区与所需权限。\n\n任务：{task}',
         'btn.cancel': '终止',
         'btn.cancelling': '返航中…',
         'btn.close': '关闭',
@@ -68,7 +96,10 @@ window.__ModuleLoader__.load({
         'status.cancelled': '返航',
         'status.timeout': '失联',
         'status.idle': '待命',
+        'status.unconnected': '等待连接',
+        'status.checking': '检测中',
         'task.idle': '待命中，随时可以出发。',
+        'task.connect': '完成连接后即可派遣任务。',
         'task.empty': '（无任务描述）',
         'meta.elapsed': '计时',
         'meta.output': '输出',
@@ -124,6 +155,34 @@ window.__ModuleLoader__.load({
         'state.offline.hint': 'Check that the Web service is running, then retry.',
         'btn.refresh': 'Refresh',
         'btn.detail': 'Details',
+        'btn.connect': 'Connect',
+        'btn.checkLogin': 'Check sign-in',
+        'btn.dispatch': 'Dispatch',
+        'btn.recheck': 'Check again',
+        'btn.openChat': 'Open a draft chat',
+        'availability.available': 'CLI found · sign-in unverified',
+        'availability.missing': 'Awaiting connection · CLI not found',
+        'availability.unsupported': 'Awaiting connection · unsupported entry point',
+        'availability.unknown': 'Connection not yet verified',
+        'availability.loading': 'Checking CLI…',
+        'connect.title': 'Connect {name}',
+        'connect.intro': 'Check the local CLI, then use a DSH chat for installation or sign-in. Nothing is installed or executed automatically.',
+        'connect.skill': 'Skill',
+        'connect.skillName': 'Conductor · external agent dispatch',
+        'connect.found': 'Executable found; confirm sign-in in the chat.',
+        'connect.missing': 'No usable executable found. Open a chat for installation and sign-in guidance.',
+        'connect.unsupported': 'The Windows entry point is not supported by the bundle; ask in chat about alternatives.',
+        'connect.unknown': 'The CLI status could not be determined. Check again or troubleshoot in chat.',
+        'connect.install': 'Installation reference',
+        'connect.note': 'Check the selected workspace, review and send the draft yourself; installation and sign-in follow DSH approval.',
+        'dispatch.title': 'Dispatch to {name}',
+        'dispatch.intro': 'Describe the task. Check the workspace and edit the example in chat before sending it.',
+        'dispatch.task': 'Task',
+        'dispatch.example': 'Read the README in the current workspace and summarize the project, its main features and how to run it locally. Analyze only; do not edit files.',
+        'dispatch.note': 'Dispatch uses the target CLI account quota. The target cannot see this conversation, so include the necessary context.',
+        'chat.unavailable': 'This DSH version cannot open a draft chat. Use the conductor skill in a conversation.',
+        'chat.connectPrompt': 'Use the conductor skill to check whether {name} CLI is installed and signed in, and explain how to connect it. If installation is needed, explain the steps and wait for my confirmation; do not install it automatically.',
+        'chat.dispatchPrompt': 'Use the conductor_dispatch tool to delegate the task below to {name} ({id}) and summarize the result. First check the workspace and required permissions.\n\nTask: {task}',
         'btn.cancel': 'Terminate',
         'btn.cancelling': 'Returning…',
         'btn.close': 'Close',
@@ -136,7 +195,10 @@ window.__ModuleLoader__.load({
         'status.cancelled': 'Recalled',
         'status.timeout': 'Overdue',
         'status.idle': 'Standing by',
+        'status.unconnected': 'Awaiting connection',
+        'status.checking': 'Checking',
         'task.idle': 'Standing by, ready to sail.',
+        'task.connect': 'Connect to start dispatching.',
         'task.empty': '(no task text)',
         'meta.elapsed': 'Elapsed',
         'meta.output': 'Output',
@@ -414,6 +476,24 @@ window.__ModuleLoader__.load({
 .dshc-card[data-status="idle"] .dshc-actions { padding-top: 0; border-top: 0; }
 .dshc-actions { border-top: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.06)); padding-top: 10px; }
 .dshc-actions-hint { color: #679897; }
+.dshc-availability { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.4; color: var(--dsw-alias-label-tertiary, #81858c); }
+.dshc-availability-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: #d3a35a; }
+.dshc-availability[data-availability="available"] .dshc-availability-dot { background: #39b980; }
+.dshc-availability[data-availability="loading"] .dshc-availability-dot { background: #9aa4ad; }
+.dshc-dispatch { color: #16745f; border-color: rgba(42,155,126,.3); background: rgba(68,177,143,.08); }
+.dshc-action-dialog { width: min(560px, 94vw); }
+.dshc-dialog-intro { font-size: 13px; line-height: 1.65; color: var(--dsw-alias-label-secondary, #5c6169); margin: 18px 0; }
+.dshc-dialog-note { font-size: 12px; line-height: 1.6; color: var(--dsw-alias-label-tertiary, #81858c); }
+.dshc-skill-choice { display: flex; align-items: center; gap: 12px; border: 1px solid rgba(52,151,131,.35); background: rgba(64,171,146,.07); border-radius: 12px; padding: 13px; }
+.dshc-skill-choice small, .dshc-skill-choice b, .dshc-install small { display: block; }
+.dshc-skill-choice small, .dshc-install small { font-size: 11px; color: var(--dsw-alias-label-tertiary, #81858c); margin-bottom: 4px; }
+.dshc-skill-choice b { font-size: 13px; }
+.dshc-skill-symbol { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #d8eee7; color: #247f6a; }
+.dshc-install { padding: 10px 12px; border-radius: 8px; background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.035)); overflow-wrap: anywhere; font-size: 12px; }
+.dshc-task-label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 600; }
+.dshc-task-input { box-sizing: border-box; width: 100%; resize: vertical; min-height: 120px; border: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.15)); border-radius: 10px; padding: 12px; font: inherit; font-size: 13px; line-height: 1.6; background: var(--dsw-alias-bg-base, #fff); color: inherit; }
+.dshc-task-input:focus-visible { outline: 2px solid #51bda9; outline-offset: 2px; }
+.dshc-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
 .dshc-log { border-radius: 14px; background: var(--dsw-alias-bg-elevated, #fff); }
 .dshc-empty { padding: 30px 20px; }
 .dshc-foot { text-align: left; margin: 26px 2px; }
@@ -678,7 +758,7 @@ window.__ModuleLoader__.load({
         h('span', { className: 'dshc-dot' }), label)
     }
 
-    function FleetCard({ crew, run, nowMs, busyId, onDetail, onCancel }) {
+    function FleetCard({ crew, run, availability, nowMs, busyId, onDetail, onCancel, onConnect, onDispatch }) {
       const status = statusKey(run)
       const elapsed = elapsedOf(run, nowMs)
       return h('div', { className: 'dshc-card', 'data-status': status === 'idle' ? 'idle' : status, style: { '--crew-accent': crew.accent } },
@@ -687,8 +767,10 @@ window.__ModuleLoader__.load({
           h('div', { className: 'dshc-id' },
             h('div', { className: 'dshc-name' }, crew.name),
             h('div', { className: 'dshc-callsign' }, crew.id)),
-          h(StatusPill, { status, label: statusLabel(run) })),
-        h('div', { className: 'dshc-task' }, run === null ? t('task.idle') : (run.taskPreview || t('task.empty'))),
+          h(StatusPill, { status, label: run !== null ? statusLabel(run) : !availability ? t('status.checking') : availability.status === 'available' ? t('status.idle') : t('status.unconnected') })),
+        h('div', { className: 'dshc-availability', 'data-availability': availability?.status ?? 'loading' },
+          h('span', { className: 'dshc-availability-dot' }), t(availability ? `availability.${availability.status}` : 'availability.loading')),
+        h('div', { className: 'dshc-task' }, run === null ? t(availability?.status === 'available' ? 'task.idle' : 'task.connect') : (run.taskPreview || t('task.empty'))),
         run === null
           ? h('div', { className: 'dshc-meta' }, h('span', null, t('hint.idle')))
           : h('div', { className: 'dshc-meta' },
@@ -699,9 +781,12 @@ window.__ModuleLoader__.load({
         run !== null ? h('pre', { className: run.outputTail ? 'dshc-tail' : 'dshc-tail dshc-tail-empty' },
           run.outputTail || t('tail.empty')) : null,
         h('div', { className: 'dshc-actions' },
-          run === null
-            ? h('span', { className: 'dshc-actions-hint' }, t('hint.dispatch'))
-            : h('button', { type: 'button', className: 'dshc-btn', onClick: () => onDetail(run.id) }, t('btn.detail')),
+          availability?.status === 'available' && status !== 'running' && status !== 'cancelling'
+            ? h('button', { type: 'button', className: 'dshc-btn dshc-dispatch', onClick: () => onDispatch(crew) }, t('btn.dispatch'))
+            : availability?.status !== 'available'
+              ? h('button', { type: 'button', className: 'dshc-btn', onClick: () => onConnect(crew) }, t('btn.connect')) : null,
+          availability?.status === 'available' && status !== 'running' && status !== 'cancelling' ? h('button', { type: 'button', className: 'dshc-btn', onClick: () => onConnect(crew) }, t('btn.checkLogin')) : null,
+          run !== null ? h('button', { type: 'button', className: 'dshc-btn', onClick: () => onDetail(run.id) }, t('btn.detail')) : null,
           status === 'running'
             ? h('button', {
                 type: 'button',
@@ -785,9 +870,37 @@ window.__ModuleLoader__.load({
               ]))
     }
 
+    function ActionDialog({ action, info, task, checking, onTask, onClose, onRecheck, onOpenChat }) {
+      if (action === null) return null
+      const { kind, crew } = action
+      const connect = kind === 'connect'
+      return h('div', { className: 'dshc-mask', onClick: onClose },
+        h('div', { className: 'dshc-drawer dshc-action-dialog', role: 'dialog', 'aria-modal': 'true', 'aria-label': t(connect ? 'connect.title' : 'dispatch.title', { name: crew.name }), onClick: (event) => event.stopPropagation() },
+          h('div', { className: 'dshc-drawer-head' },
+            h(CrewAvatar, { crew, size: 54 }),
+            h('h3', null, t(connect ? 'connect.title' : 'dispatch.title', { name: crew.name })),
+            h('button', { type: 'button', className: 'dshc-btn', onClick: onClose }, t('btn.close'))),
+          h('p', { className: 'dshc-dialog-intro' }, t(connect ? 'connect.intro' : 'dispatch.intro')),
+          connect ? [
+            h('div', { className: 'dshc-skill-choice' },
+              h('span', { className: 'dshc-skill-symbol', 'aria-hidden': 'true' }, '✦'),
+              h('span', null, h('small', null, t('connect.skill')), h('b', null, t('connect.skillName')))),
+            h('p', { className: 'dshc-dialog-note' }, t(info?.status === 'available' ? 'connect.found' : info?.status === 'missing' ? 'connect.missing' : info?.status === 'unsupported' ? 'connect.unsupported' : 'connect.unknown')),
+            info?.install ? h('div', { className: 'dshc-install' }, h('small', null, t('connect.install')), h('code', null, info.install)) : null,
+            h('p', { className: 'dshc-dialog-note' }, t('connect.note')),
+          ] : [
+            h('label', { className: 'dshc-task-label', htmlFor: 'dshc-dispatch-task' }, t('dispatch.task')),
+            h('textarea', { id: 'dshc-dispatch-task', className: 'dshc-task-input', value: task, onChange: (event) => onTask(event.target.value), rows: 5 }),
+            h('p', { className: 'dshc-dialog-note' }, t('dispatch.note')),
+          ],
+          h('div', { className: 'dshc-dialog-actions' },
+            connect ? h('button', { type: 'button', className: 'dshc-btn', disabled: checking, onClick: () => onRecheck(crew.id) }, checking ? t('availability.loading') : t('btn.recheck')) : null,
+            h('button', { type: 'button', className: 'dshc-btn dshc-btn-primary', disabled: !connect && task.trim() === '', onClick: onOpenChat }, t('btn.openChat')))))
+    }
+
     /* ------------------------------ page ------------------------------ */
 
-    function App() {
+    function App({ startSession } = {}) {
       const [state, setState] = React.useState(null)
       const [loadError, setLoadError] = React.useState(null)
       const [tick, setTick] = React.useState(0)
@@ -798,6 +911,10 @@ window.__ModuleLoader__.load({
       const [busyId, setBusyId] = React.useState(null)
       const [limitDraft, setLimitDraft] = React.useState('')
       const [notice, setNotice] = React.useState('')
+      const [availability, setAvailability] = React.useState(null)
+      const [checking, setChecking] = React.useState(false)
+      const [action, setAction] = React.useState(null)
+      const [taskDraft, setTaskDraft] = React.useState('')
 
       React.useEffect(() => {
         const id = setInterval(() => setNowMs(Date.now()), 1000)
@@ -838,6 +955,31 @@ window.__ModuleLoader__.load({
       }, [notice])
 
       const refresh = () => setTick((value) => value + 1)
+
+      const checkAvailability = React.useCallback(async () => {
+        setChecking(true)
+        try {
+          const body = await api('/availability')
+          setAvailability(Object.fromEntries((body.agents ?? []).map((item) => [item.id, item])))
+        } catch {
+          setAvailability(Object.fromEntries(CREW.map((crew) => [crew.id, { id: crew.id, status: 'unknown' }])))
+        } finally { setChecking(false) }
+      }, [])
+      React.useEffect(() => { checkAvailability() }, [checkAvailability])
+
+      const openAction = (kind, crew) => {
+        setTaskDraft(kind === 'dispatch' ? t('dispatch.example') : '')
+        setAction({ kind, crew })
+      }
+      const openActionChat = () => {
+        if (!action) return
+        if (typeof startSession !== 'function') { setNotice(t('chat.unavailable')); setAction(null); return }
+        const prompt = action.kind === 'connect'
+          ? t('chat.connectPrompt', { name: action.crew.name })
+          : t('chat.dispatchPrompt', { name: action.crew.name, id: action.crew.id, task: taskDraft.trim() })
+        startSession(prompt)
+        setAction(null)
+      }
 
       // Keep an open report current; ignore late replies after it is closed or changed.
       React.useEffect(() => {
@@ -973,6 +1115,9 @@ window.__ModuleLoader__.load({
               key: crew.id,
               crew,
               run: runs.get(crew.id) ?? null,
+              availability: availability?.[crew.id] ?? null,
+              onConnect: (item) => openAction('connect', item),
+              onDispatch: (item) => openAction('dispatch', item),
               nowMs,
               busyId,
               onDetail: openDetail,
@@ -992,6 +1137,7 @@ window.__ModuleLoader__.load({
                 }))),
           h('div', { className: 'dshc-foot' },
             [t('footer.note'), state?.version ? `v${state.version}` : null].filter(Boolean).join(' · '))),
+        h(ActionDialog, { action, info: action ? availability?.[action.crew.id] : null, task: taskDraft, checking, onTask: setTaskDraft, onClose: () => setAction(null), onRecheck: checkAvailability, onOpenChat: openActionChat }),
         h(DetailDrawer, {
           open: detailId !== null,
           run: detail,
@@ -1025,12 +1171,13 @@ window.__ModuleLoader__.load({
       ctx.slots.inject('main', () => ctx.slots.register({
         name: 'main',
         key: PANEL_ID,
+        inject: () => ({ startSession: (prompt) => ctx.uiWorkspace.startSession(undefined, { prompt, whenDraftExists: 'append' }) }),
       }, App))
     }
 
     exports.name = 'dsh-agent-conductor'
     exports.apply = apply
-    exports.inject = ['slots', 'locale']
+    exports.inject = ['slots', 'locale', 'uiWorkspace']
     return module.exports
   },
 })

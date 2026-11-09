@@ -344,3 +344,46 @@ test('unknown /conductor routes return 404 JSON', async () => {
   assert.equal(response.status, 404)
   assert.equal(response.json.ok, false)
 })
+
+test('availability resolves binaries without executing them or asserting authentication', async () => {
+  let spawned = 0
+  const calls = []
+  const probeAgents = [
+    { id: 'present', name: 'Present', argv: ['present-cli'], install: 'install present' },
+    { id: 'missing', name: 'Missing', argv: ['missing-cli'], install: 'install missing' },
+    { id: 'broken', name: 'Broken', argv: ['broken-cli'], install: 'install broken' },
+    { id: 'shim', name: 'Shim', argv: ['shim-cli'], install: 'install shim' },
+  ]
+  const subprocess = {
+    async resolveExecutable(cmd) {
+      calls.push(cmd)
+      if (cmd === 'missing-cli') throw new Error('executable not found on PATH')
+      if (cmd === 'broken-cli') throw new Error('service unavailable')
+      return cmd === 'shim-cli' ? 'C:\\bin\\shim.cmd' : 'C:\\bin\\present.exe'
+    },
+    spawn() { spawned++; throw new Error('must not execute') },
+  }
+  const handler = createConductorHandler({ store: createRunStore(), probeAgents, getSubprocess: () => subprocess, platform: 'win32' })
+  const response = await hit(handler, { url: '/conductor/availability', headers: { host: HOST } })
+  assert.equal(response.status, 200)
+  assert.deepEqual(response.json.agents.map((a) => a.status), ['available', 'missing', 'unknown', 'unsupported'])
+  assert.ok(response.json.agents.every((a) => a.authentication === 'unknown'))
+  assert.ok(!JSON.stringify(response.json).includes('C:\\\\bin'), 'local executable paths are not exposed')
+  assert.equal(spawned, 0)
+  assert.equal(calls.length, 4)
+  calls.length = 0
+  const one = await hit(handler, { url: '/conductor/availability?id=present', headers: { host: HOST } })
+  assert.deepEqual(one.json.agents.map((a) => a.id), ['present'])
+  assert.deepEqual(calls, ['present-cli'])
+  assert.equal((await hit(handler, { url: '/conductor/availability?id=invalid', headers: { host: HOST } })).status, 404)
+  assert.equal((await hit(handler, { url: '/conductor/availability', headers: { host: HOST, origin: 'https://evil.example' } })).status, 403)
+})
+
+test('availability reports unknown when the host resolver is absent or inconclusive', async () => {
+  const probeAgents = [{ id: 'codex', name: 'Codex', argv: ['codex'], install: 'install codex' }]
+  for (const getSubprocess of [() => null, () => ({ resolveExecutable: async () => '' }), () => { throw new Error('host down') }]) {
+    const handler = createConductorHandler({ store: createRunStore(), probeAgents, getSubprocess })
+    const result = await hit(handler, { url: '/conductor/availability', headers: { host: HOST } })
+    assert.equal(result.json.agents[0].status, 'unknown')
+  }
+})

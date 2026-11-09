@@ -175,6 +175,33 @@ async function resolveArgv0(subprocess, agent, argv, platform = process.platform
   return [executable, ...argv.slice(1)]
 }
 
+/**
+ * Read-only discovery: resolving a binary proves only that it can be found,
+ * not that the provider is authenticated or that a dispatch will succeed.
+ * Never execute the CLI or expose its absolute filesystem path to the panel.
+ */
+async function probeAgentAvailability(agent, subprocess, platform = process.platform) {
+  const result = {
+    id: agent.id, name: agent.name, status: 'unknown', authentication: 'unknown',
+    command: agent.argv[0], install: agent.install,
+  }
+  if (!subprocess || typeof subprocess.resolveExecutable !== 'function') return result
+  let timer
+  try {
+    const resolution = Promise.resolve().then(() => subprocess.resolveExecutable(agent.argv[0]))
+    const timeout = new Promise((resolve) => { timer = setTimeout(() => resolve(null), 3000) })
+    const executable = await Promise.race([resolution, timeout])
+    if (typeof executable !== 'string' || executable.trim() === '') return result
+    result.status = platform === 'win32' && /\.(cmd|bat)$/i.test(executable) ? 'unsupported' : 'available'
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error)
+    if (/ENOENT|not found|cannot find|not installed|未找到|不存在|未安装/i.test(message)) result.status = 'missing'
+  } finally {
+    clearTimeout(timer)
+  }
+  return result
+}
+
 /** Rebuild a bounded stderr transcript as head + optional elision marker + tail. */
 function formatStderr(head, tail, total) {
   if (total === 0 || head === '') return ''
@@ -250,11 +277,12 @@ async function readJsonBody(req) {
 /**
  * Same-origin JSON API for the panel:
  *   GET  /conductor/state            -> registry snapshot
+ *   GET  /conductor/availability     -> binary availability (not authentication)
  *   GET  /conductor/run?id=...       -> one run with full tails
  *   POST /conductor/cancel {id}      -> request process-tree termination
  *   POST /conductor/settings {historyLimit} -> persist retention
  */
-export function createConductorHandler({ store, version = PACKAGE_VERSION, agents = [], assetDirectory = new URL('./assets/', import.meta.url), persistSettings = writeSettings } = {}) {
+export function createConductorHandler({ store, version = PACKAGE_VERSION, agents = [], assetDirectory = new URL('./assets/', import.meta.url), persistSettings = writeSettings, getSubprocess = () => null, probeAgents = AGENTS, platform = process.platform } = {}) {
   return async function conductorHandler(req, res) {
     try {
       if (!originAllowed(req)) {
@@ -279,6 +307,19 @@ export function createConductorHandler({ store, version = PACKAGE_VERSION, agent
           'cache-control': 'no-cache',
         })
         res.end(body)
+        return
+      }
+      if (req.method === 'GET' && route === '/availability') {
+        const id = url.searchParams.get('id')
+        const selected = id === null ? probeAgents : probeAgents.filter((agent) => agent.id === id)
+        if (selected.length === 0) {
+          sendJson(res, 404, { ok: false, message: 'unknown agent' })
+          return
+        }
+        let subprocess = null
+        try { subprocess = getSubprocess() } catch { /* service unavailable */ }
+        const availability = await Promise.all(selected.map((agent) => probeAgentAvailability(agent, subprocess, platform)))
+        sendJson(res, 200, { ok: true, agents: availability })
         return
       }
       if (req.method === 'GET' && route === '/state') {
@@ -531,6 +572,7 @@ export function apply(ctx) {
           version: PACKAGE_VERSION,
           agents: AGENTS.map((agent) => ({ id: agent.id, name: agent.name })),
           persistSettings: null,
+          getSubprocess: () => ctx.get('subprocess'),
         })
         const unregister = webCtx.webServer.register({ kind: 'prefix', path: CONDUCTOR_PREFIX, handler })
         return () => unregister()
