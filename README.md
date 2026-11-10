@@ -33,7 +33,7 @@ A small fleet for big tasks.
 3. Click **Install**, then follow DSH's prompts. Restart DSH if it asks you to.
 4. Open **Commander** in the left sidebar. Install and sign in to the CLI you want to use separately.
 
-> Use the GitHub address above for the current Commander panel. The npm package may lag behind the repository and may not yet contain the panel.
+> **The package name also installs the plugin, but currently installs an older version:** in **Plugins → Add plugin**, entering `dsh-agent-conductor` installs the npm package. As of 2026-11-10, npm latest is 0.3.2 and does not include the Commander panel. Use the GitHub address above for the current panel; the package name can be used once the new version is published to npm.
 
 ## 🐟 Meet your command room
 
