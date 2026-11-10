@@ -310,3 +310,12 @@ test('Kimi and Qwen use the intended reference portraits', (t) => {
   assert.deepEqual(portrait('Kimi CLI').props.style, { left: '-200%', top: '-100%' })
   assert.deepEqual(portrait('Qwen Code').props.style, { left: '-300%', top: '-100%' })
 })
+
+test('OpenCode and Cursor use the requested swapped portraits', (t) => {
+  const ui = makeInteractionHarness({}, t)
+  const tree = ui.render()
+  const portrait = (name) => ui.descendants([ui.card(tree, name)])
+    .find((node) => node.type === 'img' && node.props.className === 'dshc-avatar-atlas')
+  assert.deepEqual(portrait('OpenCode').props.style, { left: '-100%', top: '-100%' })
+  assert.deepEqual(portrait('Cursor CLI').props.style, { left: '-300%', top: '0%' })
+})

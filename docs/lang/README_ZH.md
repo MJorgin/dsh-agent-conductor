@@ -17,6 +17,20 @@
 
 ---
 
+## 🚀 在 DSH 中安装指挥官
+
+1. 点击左侧 **「插件」**，进入 **「已安装」**。
+2. 点击 **「添加插件」**，在「包名或地址」中填入 GitHub 仓库地址：
+
+   ```text
+   https://github.com/MJorgin/dsh-agent-conductor
+   ```
+
+3. 点击 **「安装」**，按 DSH 提示完成操作；如提示重启，请重启 DSH。
+4. 在左侧点击 **「指挥官」**。想要派遣的 CLI 还需单独安装并登录。
+
+> 要使用当前的指挥官面板，请填写上面的 GitHub 地址。npm 包可能落后于仓库，未必包含该面板。
+
 ## 🐟 欢迎来到指挥室
 
 ![DeepSeek Harness 中的大肥鱼指挥官页面：舰长与 Agent 船员编队](../../docs/images/commander-panel.png)
@@ -202,10 +216,10 @@ bundle 现在也带浏览器半边：左侧栏新增 **指挥官** 一行，紧�
 仓库同时是一个 dsh bundle——宿主半边（`dsh.bundle`）+ 浏览器半边（`dsh.client.platform = "web"`），一条命令装进 profile：
 
 ```sh
-dsh plugin --profile desktop add dsh-agent-conductor
+dsh plugin --profile desktop add github:MJorgin/dsh-agent-conductor
 ```
 
-或直接从 GitHub 装：`dsh plugin --profile desktop add github:MJorgin/dsh-agent-conductor`。profile 不叫 `desktop` 就换成你的名字；安装新 bundle 后重启 DSH（替换已安装包时也要重启才能加载新的 client module）。
+profile 不叫 `desktop` 就换成你的名字；如 DSH 提示重启，请按提示操作，替换已安装包时可能需要重启才能加载新的 client module。图形界面操作见[在 DSH 中安装指挥官](#-在-dsh-中安装指挥官)。
 
 - 工具、面板与技能三处共用同一份 CLI 注册表（`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py`，新增 CLI 时保持同步）；
 - 浏览器半边是手写 client module（`client.js`）：通过 `ctx.slots` 注册左侧一行和 `main` 页面，且只访问同源 `/conductor` 路由；

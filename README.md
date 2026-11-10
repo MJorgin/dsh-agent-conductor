@@ -21,6 +21,20 @@ A small fleet for big tasks.
 
 ---
 
+## 🚀 Install the Commander in DSH
+
+1. Open **Plugins** in the left sidebar, then select **Installed**.
+2. Click **Add plugin** and enter this GitHub repository address:
+
+   ```text
+   https://github.com/MJorgin/dsh-agent-conductor
+   ```
+
+3. Click **Install**, then follow DSH's prompts. Restart DSH if it asks you to.
+4. Open **Commander** in the left sidebar. Install and sign in to the CLI you want to use separately.
+
+> Use the GitHub address above for the current Commander panel. The npm package may lag behind the repository and may not yet contain the panel.
+
 ## 🐟 Meet your command room
 
 ![Big Fat Fish Commander panel showing the captain and agent fleet in DeepSeek Harness](docs/images/commander-panel.png)
@@ -208,10 +222,10 @@ Notes:
 This repo is also a dsh bundle — a host half (`dsh.bundle`) plus a browser half (`dsh.client.platform = "web"`). One command installs both into a profile:
 
 ```sh
-dsh plugin --profile desktop add dsh-agent-conductor
+dsh plugin --profile desktop add github:MJorgin/dsh-agent-conductor
 ```
 
-Or straight from GitHub: `dsh plugin --profile desktop add github:MJorgin/dsh-agent-conductor`. Use your own profile name if it isn't `desktop`; restart DSH after installing a new bundle (a replaced package also needs a restart before its new client module is served).
+Use your own profile name if it isn't `desktop`. Follow DSH's restart prompt if one is shown; a replaced package may need a restart before its new client module is served. See [Install the Commander in DSH](#-install-the-commander-in-dsh) for the graphical route.
 
 - The tool, the panel and the skill share the same CLI registry (`index.js` ⇄ `conductor-dynamic.js` ⇄ `dispatch.py` — keep the three in sync when adding CLIs);
 - The browser half is a hand-written client module (`client.js`): it registers the sidebar row and the `main` page through `ctx.slots`, and talks only to the same-origin `/conductor` route;
