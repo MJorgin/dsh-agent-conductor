@@ -29,7 +29,7 @@
 3. 点击 **「安装」**，按 DSH 提示完成操作；如提示重启，请重启 DSH。
 4. 在左侧点击 **「指挥官」**。想要派遣的 CLI 还需单独安装并登录。
 
-> 也可输入 GitHub 仓库地址 `https://github.com/MJorgin/dsh-agent-conductor` 安装源码版本。
+> 如果包名安装后没有「指挥官」面板，请检查 npm 版本是否已更新到 0.4.0；也可输入 GitHub 仓库地址 `https://github.com/MJorgin/dsh-agent-conductor` 安装当前源码版本。
 
 ## 🐟 欢迎来到指挥室
 

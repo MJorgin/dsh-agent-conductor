@@ -33,7 +33,7 @@ A small fleet for big tasks.
 3. Click **Install**, then follow DSH's prompts. Restart DSH if it asks you to.
 4. Open **Commander** in the left sidebar. Install and sign in to the CLI you want to use separately.
 
-> You can also install from the GitHub repository: `https://github.com/MJorgin/dsh-agent-conductor`.
+> If the Commander panel is missing after installation, check that npm has updated to 0.4.0. You can also install the current source from `https://github.com/MJorgin/dsh-agent-conductor`.
 
 ## 🐟 Meet your command room
 
