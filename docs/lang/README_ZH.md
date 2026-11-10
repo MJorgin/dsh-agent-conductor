@@ -20,16 +20,16 @@
 ## 🚀 在 DSH 中安装指挥官
 
 1. 点击左侧 **「插件」**，进入 **「已安装」**。
-2. 点击 **「添加插件」**，在「包名或地址」中填入 GitHub 仓库地址：
+2. 点击 **「添加插件」**，在「包名或地址」中填入：
 
    ```text
-   https://github.com/MJorgin/dsh-agent-conductor
+   dsh-agent-conductor
    ```
 
 3. 点击 **「安装」**，按 DSH 提示完成操作；如提示重启，请重启 DSH。
 4. 在左侧点击 **「指挥官」**。想要派遣的 CLI 还需单独安装并登录。
 
-> **输入包名也可以安装，但当前是旧版：**在「插件 → 添加插件」中输入 `dsh-agent-conductor` 会安装 npm 版本。截至 2026-11-10，npm 最新版为 0.3.2，不含「大肥鱼指挥官」面板。要使用当前面板，请填写上面的 GitHub 地址；待新版发布到 npm 后，再输入包名即可安装。
+> 也可输入 GitHub 仓库地址 `https://github.com/MJorgin/dsh-agent-conductor` 安装源码版本。
 
 ## 🐟 欢迎来到指挥室
 
