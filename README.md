@@ -33,7 +33,7 @@ A small fleet for big tasks.
 3. Click **Install**, then follow DSH's prompts. Restart DSH if it asks you to.
 4. Open **Commander** in the left sidebar. Install and sign in to the CLI you want to use separately.
 
-> If the Commander panel is missing after installation, check that npm has updated to 0.4.0. You can also install the current source from `https://github.com/MJorgin/dsh-agent-conductor`.
+> If the Commander panel is missing after installation, check that npm has updated to 0.4.1. You can also install the current source from `https://github.com/MJorgin/dsh-agent-conductor`.
 
 ## 🐟 Meet your command room
 
@@ -199,13 +199,14 @@ python3 skills/conductor/scripts/dispatch.py doctor
 
 > Install packages were verified against the npm registry: Kimi is `@moonshot-ai/kimi-code` (bin `kimi`), Grok is `@xai-official/grok` (bin `grok`), Copilot is `@github/copilot` (bin `copilot`), Codex is `@openai/codex`. The `kimi-cli` npm package is an unrelated placeholder with no binary — do not use it.
 
-## 🐟 The 大肥鱼指挥官 panel (0.4.0+)
+## 🐟 The 大肥鱼指挥官 panel (0.4.1+)
 
 The bundle now ships a browser half too: a **指挥官** row in the left sidebar, placed immediately above the built-in **更多** menu — the panel's Chinese display name is **大肥鱼指挥官** (Big Fat Fish Commander). It turns dispatches into a small "deep-sea war room":
 
 - **Fleet** — a blue-haired whale captain and 11 AI-generated portraits inspired by the supplied character references. Cards show CLI availability and the latest dispatch; active cards animate subtly, respecting reduced-motion preferences;
 - **Connect and dispatch** — the panel checks whether each CLI executable can be resolved. Choose **Connect** for a guided sign-in/install draft, or **Dispatch** for an editable task example. Opening a draft never sends it or runs a CLI; review the selected workspace before sending;
 - **Ship log** — the last N runs (default 50, adjustable in the header). Completed-run summaries and the retention setting are saved locally in `~/.dsh/conductor-crew.json` and restored after a restart; click a row for details;
+- **Status coverage** — every run reports one of *running*, *cancelling*, *done*, *failed*, *cancelled*, *timeout* or *interrupted* (the CLI was killed by a signal). Availability is shown separately (*available* / *missing* / *unsupported* / *unverified*). Header chips count active, returned, lost, recalled and overdue runs, plus interrupted when present; the panel follows the app's light or dark theme;
 - **Detail & terminate** — while the host is running, inspect argv, working directory, duration, exit code, stdout/stderr tails and errors; the 终止 button stops a running process tree. An open report refreshes automatically;
 - The page polls the same-origin `/conductor/state` route, and only while it is visible; nothing leaves the machine.
 
@@ -249,7 +250,7 @@ tests/                         # clip, store, route, client-module and CLI-glue 
 ## 🗺️ Roadmap
 
 - [x] `doctor` health check and dry-run preview
-- [x] 大肥鱼指挥官 panel — live fleet status, ship log, per-run detail + 终止 (0.4.0)
+- [x] 大肥鱼指挥官 panel — live fleet status, ship log, per-run detail + 终止 (0.4.1)
 - [x] AI-generated crew portraits and whale captain, with SVG fallbacks
 - [ ] Routing by capability, speed, and cost
 - [ ] Task-board recycling: dispatch results written back to dsh-task-board cards

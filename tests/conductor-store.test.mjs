@@ -75,6 +75,25 @@ test('begin/noteOutput/finish produce a bounded, truthful run view', () => {
   assert.equal(store.snapshot().history.length, 1)
 })
 
+test('signal-terminated runs are a final status with their own tally', () => {
+  let clock = 1_000
+  const store = createRunStore({ historyLimit: 5, now: () => clock })
+  const run = store.begin({ agentId: 'codex', agentName: 'Codex', task: 't', cwd: '/tmp' })
+  clock = 2_200
+  store.finish(run.id, 'terminated', { error: 'Codex 被信号 SIGKILL 终止。' })
+  const snapshot = store.snapshot()
+  assert.equal(snapshot.stats.terminated, 1)
+  assert.equal(snapshot.stats.failed, 0)
+  assert.equal(snapshot.history[0].status, 'terminated')
+  assert.equal(snapshot.events.at(-1).type, 'terminated')
+
+  const restored = createRunStore({ historyLimit: 5, history: store.exportHistory() })
+  const restoredSnapshot = restored.snapshot()
+  assert.equal(restoredSnapshot.history[0].status, 'terminated')
+  assert.equal(restoredSnapshot.stats.terminated, 1)
+  assert.equal(restoredSnapshot.events[0].type, 'terminated')
+})
+
 test('output buffers stay bounded while outputChars keeps the true length', () => {
   const store = createRunStore()
   const run = store.begin({ agentId: 'claude-code', agentName: 'Claude Code', task: 'long' })

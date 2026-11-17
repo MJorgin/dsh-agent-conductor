@@ -29,7 +29,7 @@
 3. 点击 **「安装」**，按 DSH 提示完成操作；如提示重启，请重启 DSH。
 4. 在左侧点击 **「指挥官」**。想要派遣的 CLI 还需单独安装并登录。
 
-> 如果包名安装后没有「指挥官」面板，请检查 npm 版本是否已更新到 0.4.0；也可输入 GitHub 仓库地址 `https://github.com/MJorgin/dsh-agent-conductor` 安装当前源码版本。
+> 如果包名安装后没有「指挥官」面板，请检查 npm 版本是否已更新到 0.4.1；也可输入 GitHub 仓库地址 `https://github.com/MJorgin/dsh-agent-conductor` 安装当前源码版本。
 
 ## 🐟 欢迎来到指挥室
 
@@ -193,13 +193,14 @@ python3 skills/conductor/scripts/dispatch.py doctor
 
 > 安装包已对照 npm registry 核实：Kimi 是 `@moonshot-ai/kimi-code`（bin `kimi`）、Grok 是 `@xai-official/grok`（bin `grok`）、Copilot 是 `@github/copilot`（bin `copilot`）、Codex 是 `@openai/codex`。npm 上的 `kimi-cli` 是个没有二进制的占位包，请勿使用。
 
-## 🐟 大肥鱼指挥官面板（0.4.0+）
+## 🐟 大肥鱼指挥官面板（0.4.1+）
 
 bundle 现在也带浏览器半边：左侧栏新增 **指挥官** 一行，紧贴内置的 **更多** 菜单上方——面板中文名是 **大肥鱼指挥官**。它把派活变成一间小小的「深海作战室」：
 
 - **鱼群编队**：保留蓝发鲸鱼少女舰长，11 位 CLI 头像根据提供的角色参考图重新生成并统一画风。船员卡显示 CLI 检测结果、任务状态、计时和 stdout 尾迹；执行中的动画支持系统的减少动态效果设置；
 - **连接与派遣**：面板检测 CLI 可执行文件。点击「连接」获取安装、登录的对话引导；检测到 CLI 的船员可点「派遣」，编辑任务样例并打开对话草稿。草稿不会自动发送或执行，请发送前核对工作区；
 - **航海日志**：最近 N 条派活记录（默认 50，面板头部可调）。已完成任务的摘要和保留设置保存在 `~/.dsh/conductor-crew.json`，重启后恢复；点击可查看详情；
+- **状态覆盖**：每次派遣都落在 *running* / *cancelling* / *done* / *failed* / *cancelled* / *timeout* / *interrupted*（CLI 被信号终止）之一；可用性单独显示（*available* / *missing* / *unsupported* / *unverified*）。头部汇总显示出击中、凯旋、折戟、返航、失联，出现信号中断时再显示中断计数；面板跟随应用的明暗主题；
 - **详情与终止**：宿主运行期间可查看命令参数、工作目录、耗时、退出码、stdout/stderr 尾迹和错误；打开的详情会自动刷新，**终止**按钮可结束执行中的进程树；
 - 页面只在可见时轮询同源 `/conductor/state`，数据不出本机。
 
@@ -243,7 +244,7 @@ tests/                         # 截断、登记表、路由、client module 与
 ## 路线图
 
 - [x] `doctor` 健康检查和 Dry-run 预览
-- [x] 大肥鱼指挥官面板——实时编队状态、航海日志、单次详情 + 终止（0.4.0）
+- [x] 大肥鱼指挥官面板——实时编队状态、航海日志、单次详情 + 终止（0.4.1）
 - [x] 参考角色形象生成统一画风的船员与鲸鱼舰长（保留 SVG 兜底）
 - [ ] 按能力、速度和成本选择 Agent
 - [ ] 任务看板回收：派活结果写入 dsh-task-board 卡片

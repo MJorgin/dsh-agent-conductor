@@ -61,9 +61,9 @@ const ASSETS = Object.freeze({
 function readPackageVersion() {
   try {
     const parsed = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'))
-    return typeof parsed?.version === 'string' && parsed.version !== '' ? parsed.version : '0.4.0'
+    return typeof parsed?.version === 'string' && parsed.version !== '' ? parsed.version : '0.4.1'
   } catch {
-    return '0.4.0'
+    return '0.4.1'
   }
 }
 
@@ -510,6 +510,12 @@ export function apply(ctx) {
         if (run.cancelRequested) {
           store.finish(run.id, 'cancelled')
           throw new Error('CONDUCTOR_CANCELLED_BY_PANEL')
+        }
+        if (outcome && outcome.exitCode === null) {
+          const signal = outcome.signal ? ` ${outcome.signal}` : ''
+          const message = `${agent.name} 被信号${signal} 终止。`
+          store.finish(run.id, 'terminated', { error: message })
+          throw new Error(message)
         }
         if (outcome && outcome.exitCode !== 0) {
           const stderrText = formatStderr(errHead, errTail, errTotal).trim()

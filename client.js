@@ -29,6 +29,10 @@ window.__ModuleLoader__.load({
       failed: '#e5534b',
       cancelled: '#9aa4ad',
       timeout: '#e0a72e',
+      terminated: '#d97757',
+      missing: '#d9a441',
+      unsupported: '#9aa4ad',
+      unknown: '#8b949e',
       idle: '#8b949e',
     }
 
@@ -48,6 +52,9 @@ window.__ModuleLoader__.load({
         'chips.active': '出击中 {n}',
         'chips.done': '凯旋 {n}',
         'chips.failed': '折戟 {n}',
+        'chips.cancelled': '返航 {n}',
+        'chips.timeout': '失联 {n}',
+        'chips.terminated': '中断 {n}',
         'section.fleet': '鱼群编队',
         'section.log': '航海日志',
         'section.log.empty': '海面平静，还没有派活记录。用 conductor_dispatch 派第一件任务吧。',
@@ -95,6 +102,10 @@ window.__ModuleLoader__.load({
         'status.failed': '折戟',
         'status.cancelled': '返航',
         'status.timeout': '失联',
+        'status.terminated': '中断',
+        'status.missing': '未安装',
+        'status.unsupported': '入口不受支持',
+        'status.unknown': '未验证',
         'status.idle': '待命',
         'status.unconnected': '等待连接',
         'status.checking': '检测中',
@@ -147,6 +158,9 @@ window.__ModuleLoader__.load({
         'chips.active': 'Active {n}',
         'chips.done': 'Returned {n}',
         'chips.failed': 'Lost {n}',
+        'chips.cancelled': 'Recalled {n}',
+        'chips.timeout': 'Overdue {n}',
+        'chips.terminated': 'Interrupted {n}',
         'section.fleet': 'Fleet',
         'section.log': 'Ship log',
         'section.log.empty': 'Calm seas — no dispatches yet. Fire the first task with conductor_dispatch.',
@@ -194,6 +208,10 @@ window.__ModuleLoader__.load({
         'status.failed': 'Lost',
         'status.cancelled': 'Recalled',
         'status.timeout': 'Overdue',
+        'status.terminated': 'Interrupted',
+        'status.missing': 'Not installed',
+        'status.unsupported': 'Unsupported entry',
+        'status.unknown': 'Unverified',
         'status.idle': 'Standing by',
         'status.unconnected': 'Awaiting connection',
         'status.checking': 'Checking',
@@ -307,7 +325,7 @@ window.__ModuleLoader__.load({
 .dshc-btn {
   font: inherit; font-size: 12.5px; cursor: pointer; border-radius: 8px; padding: 5px 12px;
   border: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.12));
-  background: var(--dsw-alias-bg-elevated, rgba(0,0,0,.02));
+  background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.02));
   color: var(--dsw-alias-label-primary, #0f1115);
   transition: background .15s ease, border-color .15s ease;
 }
@@ -317,7 +335,11 @@ window.__ModuleLoader__.load({
 .dshc-btn-danger { color: #e5534b; border-color: rgba(229,83,75,.35); }
 .dshc-banner {
   margin-top: 16px; padding: 10px 14px; border-radius: 10px; font-size: 12.5px;
-  color: #b23b34; background: rgba(229,83,75,.08); border: 1px solid rgba(229,83,75,.25);
+  color: var(--dsw-alias-state-error-primary, #b23b34);
+  background: rgba(229,83,75,.09);
+  background: color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5534b) 9%, transparent);
+  border: 1px solid rgba(229,83,75,.24);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-error-primary, #e5534b) 24%, transparent);
 }
 .dshc-notice {
   margin-top: 16px; padding: 8px 14px; border-radius: 10px; font-size: 12.5px;
@@ -344,6 +366,7 @@ window.__ModuleLoader__.load({
   box-shadow: inset 0 0 0 1px rgba(57,185,128,.16), 0 0 26px rgba(57,185,128,.08);
 }
 .dshc-card[data-status="failed"] { border-color: rgba(229,83,75,.38); }
+.dshc-card[data-status="terminated"] { border-color: rgba(217,119,87,.42); }
 .dshc-cardhead { display: flex; align-items: center; gap: 10px; }
 .dshc-avatar { display: inline-flex; flex: none; filter: drop-shadow(0 2px 3px rgba(0,0,0,.18)); }
 .dshc-id { min-width: 0; flex: 1; }
@@ -401,7 +424,7 @@ window.__ModuleLoader__.load({
 }
 .dshc-drawer {
   width: min(760px, 94vw); max-height: 86vh; overflow: auto; box-sizing: border-box;
-  background: var(--dsw-alias-bg-elevated, #fff); color: var(--dsw-alias-label-primary, #0f1115);
+  background: var(--dsw-alias-card-fill, var(--dsw-alias-bg-layer-2, #fff)); color: var(--dsw-alias-label-primary, #0f1115);
   border: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.12)); border-radius: 16px;
   box-shadow: 0 28px 70px rgba(0,0,0,.32); padding: 20px 22px;
 }
@@ -456,12 +479,12 @@ window.__ModuleLoader__.load({
 .dshc-head .dshc-btn:hover:not(:disabled) { background: #badbd1; color: #123b3d; }
 .dshc-section-title { align-items: end; margin: 34px 2px 14px; }
 .dshc-section-title h2 { font-size: 19px; margin-top: 6px; letter-spacing: .02em; }
-.dshc-section-kicker { color: #508b8c; }
+.dshc-section-kicker { color: var(--dsw-alias-label-tertiary, #508b8c); color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #508b8c) 72%, var(--dsw-alias-label-primary, #0f1115)); }
 .dshc-section-title > span { font: 600 10px/1.2 ui-monospace, monospace; letter-spacing: .12em; }
 .dshc-fleet { grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-.dshc-card { min-width: 0; gap: 11px; padding: 16px; border-radius: 14px; background: var(--dsw-alias-bg-elevated, #fff); box-shadow: 0 3px 14px rgba(17,43,52,.035); }
+.dshc-card { min-width: 0; gap: 11px; padding: 16px; border-radius: 14px; background: var(--dsw-alias-card-fill, var(--dsw-alias-bg-layer-2, #fff)); box-shadow: 0 3px 14px rgba(17,43,52,.035); }
 .dshc-card::before { content: ''; position: absolute; top: 0; left: 16px; width: 34px; height: 3px; border-radius: 0 0 3px 3px; background: var(--crew-accent, #87a7a4); opacity: .85; }
-.dshc-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(17,43,52,.1); }
+.dshc-card:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(0,0,0,.16); }
 .dshc-card { transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease; }
 .dshc-card[data-status="running"] { border-color: #65bfa7; box-shadow: 0 0 0 1px rgba(57,185,128,.12), 0 10px 24px rgba(57,185,128,.10); }
 .dshc-card[data-status="running"] .dshc-avatar { animation: dshc-float 2.8s ease-in-out infinite; }
@@ -469,18 +492,24 @@ window.__ModuleLoader__.load({
 .dshc-cardhead { gap: 12px; }
 .dshc-name { font-size: 14px; }
 .dshc-callsign { margin-top: 4px; font-size: 10px; letter-spacing: .04em; }
-.dshc-avatar { position: relative; border-radius: 50%; overflow: hidden; background: #d5edf7; }
+.dshc-avatar { position: relative; border-radius: 50%; overflow: hidden; background: var(--dsw-alias-bg-layer-2, #d5edf7); box-shadow: inset 0 0 0 1px var(--dsw-alias-border-l2, rgba(0,0,0,.08)); }
 .dshc-avatar-atlas { position: absolute; width: 400%; height: 300%; max-width: none; object-fit: fill; }
 .dshc-task { min-height: 0; line-height: 1.55; }
 .dshc-card[data-status="idle"] .dshc-meta { display: none; }
 .dshc-card[data-status="idle"] .dshc-actions { padding-top: 0; border-top: 0; }
 .dshc-actions { border-top: 1px solid var(--dsw-alias-border-l1, rgba(0,0,0,.06)); padding-top: 10px; }
-.dshc-actions-hint { color: #679897; }
+.dshc-actions-hint { color: var(--dsw-alias-label-tertiary, #81858c); }
 .dshc-availability { display: flex; align-items: center; gap: 6px; font-size: 11px; line-height: 1.4; color: var(--dsw-alias-label-tertiary, #81858c); }
 .dshc-availability-dot { width: 6px; height: 6px; flex: none; border-radius: 50%; background: #d3a35a; }
 .dshc-availability[data-availability="available"] .dshc-availability-dot { background: #39b980; }
 .dshc-availability[data-availability="loading"] .dshc-availability-dot { background: #9aa4ad; }
-.dshc-dispatch { color: #16745f; border-color: rgba(42,155,126,.3); background: rgba(68,177,143,.08); }
+.dshc-dispatch {
+  color: var(--dsw-alias-state-success-primary, #16745f);
+  border-color: rgba(42,155,126,.3);
+  border-color: color-mix(in srgb, var(--dsw-alias-state-success-primary, #2a9b7e) 30%, transparent);
+  background: rgba(68,177,143,.08);
+  background: color-mix(in srgb, var(--dsw-alias-state-success-primary, #44b18f) 10%, transparent);
+}
 .dshc-action-dialog { width: min(560px, 94vw); }
 .dshc-dialog-intro { font-size: 13px; line-height: 1.65; color: var(--dsw-alias-label-secondary, #5c6169); margin: 18px 0; }
 .dshc-dialog-note { font-size: 12px; line-height: 1.6; color: var(--dsw-alias-label-tertiary, #81858c); }
@@ -488,13 +517,13 @@ window.__ModuleLoader__.load({
 .dshc-skill-choice small, .dshc-skill-choice b, .dshc-install small { display: block; }
 .dshc-skill-choice small, .dshc-install small { font-size: 11px; color: var(--dsw-alias-label-tertiary, #81858c); margin-bottom: 4px; }
 .dshc-skill-choice b { font-size: 13px; }
-.dshc-skill-symbol { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #d8eee7; color: #247f6a; }
+.dshc-skill-symbol { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: var(--dsw-alias-bg-layer-2, #d8eee7); color: var(--dsw-alias-state-success-primary, #247f6a); }
 .dshc-install { padding: 10px 12px; border-radius: 8px; background: var(--dsw-alias-bg-layer-2, rgba(0,0,0,.035)); overflow-wrap: anywhere; font-size: 12px; }
 .dshc-task-label { display: block; margin-bottom: 7px; font-size: 12px; font-weight: 600; }
 .dshc-task-input { box-sizing: border-box; width: 100%; resize: vertical; min-height: 120px; border: 1px solid var(--dsw-alias-border-l2, rgba(0,0,0,.15)); border-radius: 10px; padding: 12px; font: inherit; font-size: 13px; line-height: 1.6; background: var(--dsw-alias-bg-base, #fff); color: inherit; }
 .dshc-task-input:focus-visible { outline: 2px solid #51bda9; outline-offset: 2px; }
 .dshc-dialog-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
-.dshc-log { border-radius: 14px; background: var(--dsw-alias-bg-elevated, #fff); }
+.dshc-log { border-radius: 14px; background: var(--dsw-alias-card-fill, var(--dsw-alias-bg-layer-2, #fff)); }
 .dshc-empty { padding: 30px 20px; }
 .dshc-foot { text-align: left; margin: 26px 2px; }
 .dshc-btn:focus-visible, .dshc-logrow:focus-visible, .dshc-settings input:focus-visible { outline: 2px solid #51bda9; outline-offset: 2px; }
@@ -678,8 +707,8 @@ window.__ModuleLoader__.load({
       const color = STATUS_COLORS[status] ?? STATUS_COLORS.idle
       return {
         '--dshc-status': color,
-        '--dshc-status-soft': hexToRgba(color, 0.14),
-        '--dshc-status-ring': hexToRgba(color, 0.33),
+        '--dshc-status-soft': hexToRgba(color, 0.18),
+        '--dshc-status-ring': hexToRgba(color, 0.40),
       }
     }
 
@@ -746,6 +775,7 @@ window.__ModuleLoader__.load({
         failed: Number(stats.failed) || 0,
         cancelled: Number(stats.cancelled) || 0,
         timeout: Number(stats.timeout) || 0,
+        terminated: Number(stats.terminated) || 0,
       }
     }
 
@@ -765,6 +795,12 @@ window.__ModuleLoader__.load({
 
     function FleetCard({ crew, run, availability, nowMs, busyId, onDetail, onCancel, onConnect, onDispatch }) {
       const status = statusKey(run)
+      const pillStatus = run !== null ? status : availability === null || availability?.status === 'loading'
+        ? 'checking'
+        : availability.status === 'available' ? 'idle'
+          : availability.status === 'missing' ? 'missing'
+            : availability.status === 'unsupported' ? 'unsupported' : 'unknown'
+      const pillLabel = run !== null ? statusLabel(run) : t(`status.${pillStatus}`)
       const elapsed = elapsedOf(run, nowMs)
       return h('div', { className: 'dshc-card', 'data-status': status === 'idle' ? 'idle' : status, style: { '--crew-accent': crew.accent } },
         h('div', { className: 'dshc-cardhead' },
@@ -772,7 +808,7 @@ window.__ModuleLoader__.load({
           h('div', { className: 'dshc-id' },
             h('div', { className: 'dshc-name' }, crew.name),
             h('div', { className: 'dshc-callsign' }, crew.id)),
-          h(StatusPill, { status, label: run !== null ? statusLabel(run) : !availability ? t('status.checking') : availability.status === 'available' ? t('status.idle') : t('status.unconnected') })),
+          h(StatusPill, { status: pillStatus, label: pillLabel })),
         h('div', { className: 'dshc-availability', 'data-availability': availability?.status ?? 'loading' },
           h('span', { className: 'dshc-availability-dot' }), t(availability ? `availability.${availability.status}` : 'availability.loading')),
         h('div', { className: 'dshc-task' }, run === null ? t(availability?.status === 'available' ? 'task.idle' : 'task.connect') : (run.taskPreview || t('task.empty'))),
@@ -809,7 +845,8 @@ window.__ModuleLoader__.load({
         : (type === 'done' ? t('status.done')
           : type === 'failed' ? t('status.failed')
             : type === 'cancelled' ? t('status.cancelled')
-              : type === 'timeout' ? t('status.timeout') : t('status.idle'))
+              : type === 'timeout' ? t('status.timeout')
+                : type === 'terminated' ? t('status.terminated') : t('status.idle'))
       return h('button', { type: 'button', className: 'dshc-logrow', onClick: () => onDetail(event.runId) },
         h('span', { className: 'dshc-logtime' }, formatClock(event.at)),
         h('span', { className: 'dshc-pill', style: statusStyle(type) }, h('span', { className: 'dshc-dot' }), label),
@@ -1086,7 +1123,12 @@ window.__ModuleLoader__.load({
                 h('div', { className: 'dshc-chips' },
                   h('span', { className: 'dshc-chip', style: statusStyle('running') }, h('span', { className: 'dshc-dot' }), t('chips.active', { n: stats.active })),
                   h('span', { className: 'dshc-chip', style: statusStyle('done') }, h('span', { className: 'dshc-dot' }), t('chips.done', { n: stats.done })),
-                  h('span', { className: 'dshc-chip', style: statusStyle('failed') }, h('span', { className: 'dshc-dot' }), t('chips.failed', { n: stats.failed }))))),
+                  h('span', { className: 'dshc-chip', style: statusStyle('failed') }, h('span', { className: 'dshc-dot' }), t('chips.failed', { n: stats.failed })),
+                  h('span', { className: 'dshc-chip', style: statusStyle('cancelled') }, h('span', { className: 'dshc-dot' }), t('chips.cancelled', { n: stats.cancelled })),
+                  h('span', { className: 'dshc-chip', style: statusStyle('timeout') }, h('span', { className: 'dshc-dot' }), t('chips.timeout', { n: stats.timeout })),
+                  stats.terminated > 0
+                    ? h('span', { className: 'dshc-chip', style: statusStyle('terminated') }, h('span', { className: 'dshc-dot' }), t('chips.terminated', { n: stats.terminated }))
+                    : null))),
             h('div', { className: 'dshc-header-actions' },
               h('div', { className: 'dshc-settings' },
                 h('span', null, `${t('settings.label')}`),

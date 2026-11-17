@@ -249,6 +249,10 @@ return {
         })
         try {
           const outcome = await Promise.race([child.done, aborted, timedOut])
+          if (outcome && outcome.exitCode === null) {
+            const signal = outcome.signal ? ` ${outcome.signal}` : ''
+            throw new Error(`${agent.name} 被信号${signal} 终止。`)
+          }
           if (outcome && outcome.exitCode !== 0) {
             const stderrText = formatStderr(errHead, errTail, errTotal).trim()
             const detail = stderrText || clipOutput(out, tail, total)

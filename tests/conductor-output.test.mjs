@@ -39,7 +39,7 @@ function chunkify(text, size = 4096) {
 }
 
 /** Minimal stand-in for the host `subprocess` service. */
-function fakeSubprocess(chunks, { exitCode = 0, stderr = '', resolveExecutable } = {}) {
+function fakeSubprocess(chunks, { exitCode = 0, signal = null, stderr = '', resolveExecutable } = {}) {
   const service = {
     spawn(spec) {
       service.spec = spec
@@ -57,7 +57,7 @@ function fakeSubprocess(chunks, { exitCode = 0, stderr = '', resolveExecutable }
       setImmediate(() => {
         for (const chunk of chunks) stdout.emit('data', Buffer.from(chunk))
         if (stderr !== '') stderrStream.emit('data', Buffer.from(stderr))
-        resolveDone({ exitCode })
+        resolveDone({ exitCode, signal })
       })
       return child
     },
@@ -177,6 +177,15 @@ for (const [label, loader] of LOADERS) {
     await assert.rejects(result, /已取消/)
     assert.equal(terminated, true)
     assert.equal(getEventListeners(controller.signal, 'abort').length, 0)
+  })
+
+  test(`${label}: a process killed by a signal is reported as terminated`, async () => {
+    const { state, tool } = loader()
+    state.subprocess = fakeSubprocess(chunkify('partial output'), { exitCode: null, signal: 'SIGKILL' })
+    await assert.rejects(
+      tool.execute({ agent: 'codex', task: 't' }, { agent: {}, signal: undefined }),
+      /被信号 SIGKILL 终止/,
+    )
   })
 
   test(`${label}: long output keeps the true tail instead of the middle`, async () => {

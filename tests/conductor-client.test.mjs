@@ -119,6 +119,14 @@ test('apply registers the panel row above 更多 and its main page', () => {
   assert.equal(dictionaries[0].namespace, 'conductorCrew')
   assert.equal(typeof dictionaries[0].dictionary.zh, 'object')
   assert.equal(typeof dictionaries[0].dictionary.en, 'object')
+  const zh = dictionaries[0].dictionary.zh
+  const en = dictionaries[0].dictionary.en
+  assert.equal(zh['status.terminated'], '中断')
+  assert.equal(en['status.terminated'], 'Interrupted')
+  assert.equal(zh['status.missing'], '未安装')
+  assert.equal(en['status.missing'], 'Not installed')
+  assert.equal(zh['chips.cancelled'], '返航 {n}')
+  assert.equal(zh['chips.timeout'], '失联 {n}')
 })
 
 test('the initial page render produces the war-room header and fleet', () => {
@@ -172,6 +180,8 @@ test('the initial page render produces the war-room header and fleet', () => {
   const text = React.render(React.createElement(main.component))
   assert.ok(text.includes('大肥鱼指挥官'), 'page header renders the panel name')
   assert.ok(text.includes('指挥官'), 'localized panel copy is available')
+  assert.ok(text.includes('返航 0'), 'the header carries the cancelled tally')
+  assert.ok(text.includes('失联 0'), 'the header carries the timeout tally')
 })
 
 

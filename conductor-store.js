@@ -27,7 +27,7 @@ const DETAIL_STDERR_CHARS = 4_000
 // Retain room for both a start and a finish for each configurable history row.
 const MAX_EVENTS = MAX_HISTORY_LIMIT * 2
 
-const FINAL_STATUSES = new Set(['done', 'failed', 'cancelled', 'timeout'])
+const FINAL_STATUSES = new Set(['done', 'failed', 'cancelled', 'timeout', 'terminated'])
 
 // Only the fields required to identify and summarize a completed run are
 // stored on disk. Full command arguments and output may contain credentials.
@@ -281,7 +281,7 @@ export function createRunStore(options = {}) {
   }
 
   function snapshot() {
-    const tally = { active: active.size, done: 0, failed: 0, cancelled: 0, timeout: 0 }
+    const tally = { active: active.size, done: 0, failed: 0, cancelled: 0, timeout: 0, terminated: 0 }
     for (const run of history) {
       if (run.status in tally && run.status !== 'active') tally[run.status] += 1
     }
